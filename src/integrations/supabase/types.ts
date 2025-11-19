@@ -231,6 +231,54 @@ export type Database = {
         }
         Relationships: []
       }
+      subawards: {
+        Row: {
+          amount: number
+          award_date: string | null
+          created_at: string
+          description: string | null
+          funding_record_id: string
+          id: string
+          recipient_organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          award_date?: string | null
+          created_at?: string
+          description?: string | null
+          funding_record_id: string
+          id?: string
+          recipient_organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          award_date?: string | null
+          created_at?: string
+          description?: string | null
+          funding_record_id?: string
+          id?: string
+          recipient_organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subawards_funding_record_id_fkey"
+            columns: ["funding_record_id"]
+            isOneToOne: false
+            referencedRelation: "funding_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subawards_recipient_organization_id_fkey"
+            columns: ["recipient_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string

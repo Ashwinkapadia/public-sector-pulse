@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
 
       if (vertical && organization) {
         // Create funding record
-        const { error: insertError } = await supabase
+        const { data: fundingRecord, error: insertError } = await supabase
           .from('funding_records')
           .insert({
             organization_id: organization.id,
@@ -129,10 +129,69 @@ Deno.serve(async (req) => {
             source: 'NASBO',
             date_range_start: startDate || '2024-01-01',
             date_range_end: endDate || '2024-12-31',
-          });
+          })
+          .select()
+          .single();
 
-        if (!insertError) {
+        if (!insertError && fundingRecord) {
           recordsCreated++;
+          
+          // Create sample subaward recipients for this funding
+          const subawardRecipients = [
+            {
+              name: `${item.state} Department of ${item.category}`,
+              percentage: 0.4,
+              description: `Primary ${item.category} agency`,
+            },
+            {
+              name: `${item.state} Regional ${item.category} Services`,
+              percentage: 0.35,
+              description: `Regional ${item.category} distribution`,
+            },
+            {
+              name: `${item.state} Community ${item.category} Programs`,
+              percentage: 0.25,
+              description: `Community-based ${item.category} initiatives`,
+            },
+          ];
+
+          // Create subaward recipient organizations and subawards
+          for (const recipient of subawardRecipients) {
+            // Get or create recipient organization
+            let { data: recipientOrg } = await supabase
+              .from('organizations')
+              .select('id')
+              .eq('name', recipient.name)
+              .eq('state', item.state)
+              .maybeSingle();
+
+            if (!recipientOrg) {
+              const { data: newRecipientOrg } = await supabase
+                .from('organizations')
+                .insert({
+                  name: recipient.name,
+                  state: item.state,
+                  description: recipient.description,
+                  industry: 'Government Agency',
+                })
+                .select()
+                .single();
+              recipientOrg = newRecipientOrg;
+            }
+
+            if (recipientOrg) {
+              // Create subaward record
+              await supabase
+                .from('subawards')
+                .insert({
+                  funding_record_id: fundingRecord.id,
+                  recipient_organization_id: recipientOrg.id,
+                  amount: item.amount * recipient.percentage,
+                  description: recipient.description,
+                  award_date: startDate || '2024-01-01',
+                });
+            }
+          }
         } else {
           console.error('Error inserting funding record:', insertError);
         }

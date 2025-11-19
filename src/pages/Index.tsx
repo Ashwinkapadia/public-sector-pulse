@@ -9,6 +9,7 @@ import { DateRangeSlider } from "@/components/DateRangeSlider";
 import { FundingMetrics } from "@/components/FundingMetrics";
 import { FundingChart } from "@/components/FundingChart";
 import { FundingTable } from "@/components/FundingTable";
+import { SubawardsTable } from "@/components/SubawardsTable";
 import { DataSources } from "@/components/DataSources";
 import { BonterraLogo } from "@/components/BonterraLogo";
 import { useSavedSearches, useSaveSearch, useDeleteSearch } from "@/hooks/useSavedSearches";
@@ -159,7 +160,15 @@ const Index = () => {
 
   const handleClearData = async () => {
     try {
-      // Delete funding records first (due to foreign key constraints)
+      // Delete subawards first (due to foreign key constraints)
+      const { error: subawardsError } = await supabase
+        .from("subawards")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (subawardsError) throw subawardsError;
+
+      // Delete funding records next
       const { error: fundingError } = await supabase
         .from("funding_records")
         .delete()
@@ -177,7 +186,7 @@ const Index = () => {
 
       toast({
         title: "Data cleared",
-        description: "All funding records and organizations have been removed",
+        description: "All funding records, subawards, and organizations have been removed",
       });
 
       window.location.reload();
@@ -421,6 +430,11 @@ const Index = () => {
         {/* Organizations Table */}
         <section className="mb-8">
           <FundingTable state={selectedState} />
+        </section>
+
+        {/* Subawards Table */}
+        <section className="mb-8">
+          <SubawardsTable state={selectedState} />
         </section>
 
         {/* Data Sources */}
