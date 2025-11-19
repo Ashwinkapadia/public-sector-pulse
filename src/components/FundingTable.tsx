@@ -19,13 +19,13 @@ import * as XLSX from "xlsx";
 
 interface FundingTableProps {
   state?: string;
-  grantTypeId?: string | null;
+  verticalIds?: string[];
 }
 
 type SortField = "organization" | "vertical" | "funding" | "status" | "lastUpdated";
 type SortOrder = "asc" | "desc";
 
-export function FundingTable({ state, grantTypeId }: FundingTableProps) {
+export function FundingTable({ state, verticalIds }: FundingTableProps) {
   const { data: fundingRecords, isLoading } = useFundingRecords(state);
   const { data: assignments } = useRepAssignments();
   const [sortField, setSortField] = useState<SortField>("funding");
@@ -36,12 +36,12 @@ export function FundingTable({ state, grantTypeId }: FundingTableProps) {
     return new Map(assignments.map(a => [a.organization_id, a]));
   }, [assignments]);
 
-  // Filter by grant type
-  const filteredByGrantType = useMemo(() => {
+  // Filter by verticals
+  const filteredByVerticals = useMemo(() => {
     if (!fundingRecords) return [];
-    if (!grantTypeId) return fundingRecords;
-    return fundingRecords.filter(record => record.grant_type_id === grantTypeId);
-  }, [fundingRecords, grantTypeId]);
+    if (!verticalIds || verticalIds.length === 0) return fundingRecords;
+    return fundingRecords.filter(record => verticalIds.includes(record.vertical_id));
+  }, [fundingRecords, verticalIds]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -53,9 +53,9 @@ export function FundingTable({ state, grantTypeId }: FundingTableProps) {
   };
 
   const sortedRecords = useMemo(() => {
-    if (!filteredByGrantType) return [];
+    if (!filteredByVerticals) return [];
     
-    const sorted = [...filteredByGrantType].sort((a, b) => {
+    const sorted = [...filteredByVerticals].sort((a, b) => {
       let aVal: any;
       let bVal: any;
 
@@ -90,7 +90,7 @@ export function FundingTable({ state, grantTypeId }: FundingTableProps) {
     });
 
     return sorted;
-  }, [filteredByGrantType, sortField, sortOrder]);
+  }, [filteredByVerticals, sortField, sortOrder]);
 
   const exportToCSV = () => {
     if (!sortedRecords.length) return;
