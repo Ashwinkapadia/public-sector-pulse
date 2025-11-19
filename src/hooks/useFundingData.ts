@@ -24,8 +24,15 @@ interface FundingRecord {
   date_range_start: string | null;
   date_range_end: string | null;
   notes: string | null;
+  grant_type_id: string | null;
   organizations: Organization;
   verticals: Vertical;
+  grant_types?: {
+    id: string;
+    name: string;
+    description: string | null;
+    federal_agency: string | null;
+  } | null;
 }
 
 export function useOrganizations(state?: string) {
@@ -88,7 +95,8 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
         .select(`
           *,
           organizations (*),
-          verticals (*)
+          verticals (*),
+          grant_types (*)
         `)
         .order("created_at", { ascending: false });
 

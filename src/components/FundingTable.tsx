@@ -15,15 +15,17 @@ import { useFundingRecords } from "@/hooks/useFundingData";
 import { useRepAssignments } from "@/hooks/useRepAssignments";
 import { ArrowUpDown, Download, ExternalLink } from "lucide-react";
 import * as XLSX from "xlsx";
+import { ProgramModelsDisplay } from "./ProgramModelsDisplay";
 
 interface FundingTableProps {
   state?: string;
+  grantTypeId?: string | null;
 }
 
 type SortField = "organization" | "vertical" | "funding" | "status" | "lastUpdated";
 type SortOrder = "asc" | "desc";
 
-export function FundingTable({ state }: FundingTableProps) {
+export function FundingTable({ state, grantTypeId }: FundingTableProps) {
   const { data: fundingRecords, isLoading } = useFundingRecords(state);
   const { data: assignments } = useRepAssignments();
   const [sortField, setSortField] = useState<SortField>("funding");
@@ -33,6 +35,13 @@ export function FundingTable({ state }: FundingTableProps) {
     if (!assignments) return new Map();
     return new Map(assignments.map(a => [a.organization_id, a]));
   }, [assignments]);
+
+  // Filter by grant type
+  const filteredByGrantType = useMemo(() => {
+    if (!fundingRecords) return [];
+    if (!grantTypeId) return fundingRecords;
+    return fundingRecords.filter(record => record.grant_type_id === grantTypeId);
+  }, [fundingRecords, grantTypeId]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -44,9 +53,9 @@ export function FundingTable({ state }: FundingTableProps) {
   };
 
   const sortedRecords = useMemo(() => {
-    if (!fundingRecords) return [];
+    if (!filteredByGrantType) return [];
     
-    const sorted = [...fundingRecords].sort((a, b) => {
+    const sorted = [...filteredByGrantType].sort((a, b) => {
       let aVal: any;
       let bVal: any;
 
@@ -81,7 +90,7 @@ export function FundingTable({ state }: FundingTableProps) {
     });
 
     return sorted;
-  }, [fundingRecords, sortField, sortOrder]);
+  }, [filteredByGrantType, sortField, sortOrder]);
 
   const exportToCSV = () => {
     if (!sortedRecords.length) return;
@@ -195,6 +204,8 @@ export function FundingTable({ state }: FundingTableProps) {
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
+              <TableHead>Grant Type</TableHead>
+              <TableHead>Program Models</TableHead>
               <TableHead>
                 <Button
                   variant="ghost"
@@ -243,6 +254,18 @@ export function FundingTable({ state }: FundingTableProps) {
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">{record.verticals.name}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {record.grant_types ? (
+                        <Badge variant="outline" className="text-xs">
+                          {record.grant_types.name}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <ProgramModelsDisplay fundingRecordId={record.id} />
                     </TableCell>
                     <TableCell className="font-semibold">
                       {formatCurrency(Number(record.amount))}
