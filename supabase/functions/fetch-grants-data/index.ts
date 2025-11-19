@@ -107,8 +107,31 @@ serve(async (req) => {
         // Grants.gov doesn't provide funding category in basic search, use fundingInstruments or default
         const fundingInstrument = opportunity.fundingInstruments?.[0] || "Grant";
         
-        // No award ceiling in basic search results - would need fetchOpportunity for details
-        const awardAmount = 0; // Not available in search results
+        // Grants.gov search2 doesn't include award amounts; fetch full details
+        let awardAmount = 0;
+        try {
+          const detailResponse = await fetch("https://api.grants.gov/v1/api/fetchOpportunity", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({ opportunityId: opportunity.id }),
+          });
+
+          if (detailResponse.ok) {
+            const detailData = await detailResponse.json();
+            const awardCeiling = detailData.data?.synopsis?.awardCeiling ?? detailData.data?.synopsis?.awardCeilingFormatted;
+            const parsedAmount = parseFloat(awardCeiling ?? "0");
+            if (!Number.isNaN(parsedAmount)) {
+              awardAmount = parsedAmount;
+            }
+          } else {
+            console.error(`fetchOpportunity failed for ${oppNumber}: ${detailResponse.status}`);
+          }
+        } catch (detailError) {
+          console.error("Error fetching opportunity details:", detailError);
+        }
         
         // Parse date
         const postedDate = opportunity.openDate || opportunity.postDate;
