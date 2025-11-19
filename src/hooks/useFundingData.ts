@@ -67,6 +67,22 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
   return useQuery({
     queryKey: ["funding_records", state, startDate, endDate],
     queryFn: async () => {
+      // First get organization IDs for the selected state
+      let orgIds: string[] | undefined;
+      if (state) {
+        const { data: orgs, error: orgError } = await supabase
+          .from("organizations")
+          .select("id")
+          .eq("state", state);
+        
+        if (orgError) throw orgError;
+        orgIds = orgs.map(org => org.id);
+        
+        // If no organizations found for this state, return empty array
+        if (orgIds.length === 0) return [];
+      }
+
+      // Build the main query
       let query = supabase
         .from("funding_records")
         .select(`
@@ -76,8 +92,9 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
         `)
         .order("created_at", { ascending: false });
 
-      if (state) {
-        query = query.eq("organizations.state", state);
+      // Filter by organization IDs if state was selected
+      if (orgIds) {
+        query = query.in("organization_id", orgIds);
       }
 
       if (startDate) {
@@ -100,17 +117,30 @@ export function useFundingMetrics(state?: string) {
     queryKey: ["funding_metrics", state],
     queryFn: async () => {
       let orgQuery = supabase.from("organizations").select("id", { count: "exact", head: true });
-      let fundingQuery = supabase.from("funding_records").select("amount");
 
       if (state) {
         orgQuery = orgQuery.eq("state", state);
-        fundingQuery = fundingQuery.eq("organizations.state", state);
       }
 
-      const [{ count: orgCount }, { data: fundingData }] = await Promise.all([
-        orgQuery,
-        fundingQuery,
-      ]);
+      const { count: orgCount, data: orgs } = await orgQuery;
+      
+      // Get funding data for these organizations
+      let fundingQuery = supabase.from("funding_records").select("amount");
+      
+      if (state && orgs) {
+        const orgIds = orgs.map(org => org.id);
+        if (orgIds.length === 0) {
+          return {
+            totalOrganizations: 0,
+            totalFunding: 0,
+            avgFunding: 0,
+            activePrograms: 0,
+          };
+        }
+        fundingQuery = fundingQuery.in("organization_id", orgIds);
+      }
+
+      const { data: fundingData } = await fundingQuery;
 
       const totalFunding = fundingData?.reduce((sum, record) => sum + Number(record.amount), 0) || 0;
       const avgFunding = orgCount && orgCount > 0 ? totalFunding / orgCount : 0;
