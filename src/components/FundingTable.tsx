@@ -15,7 +15,7 @@ import { useFundingRecords } from "@/hooks/useFundingData";
 import { useRepAssignments } from "@/hooks/useRepAssignments";
 import { ArrowUpDown, Download, ExternalLink } from "lucide-react";
 import * as XLSX from "xlsx";
-import { ProgramModelsDisplay } from "./ProgramModelsDisplay";
+
 
 interface FundingTableProps {
   state?: string;
@@ -205,7 +205,6 @@ export function FundingTable({ state, grantTypeId }: FundingTableProps) {
                 </Button>
               </TableHead>
               <TableHead>Grant Type</TableHead>
-              <TableHead>Program Models</TableHead>
               <TableHead>
                 <Button
                   variant="ghost"
@@ -264,9 +263,6 @@ export function FundingTable({ state, grantTypeId }: FundingTableProps) {
                         <span className="text-xs text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <ProgramModelsDisplay fundingRecordId={record.id} />
-                    </TableCell>
                     <TableCell className="font-semibold">
                       {formatCurrency(Number(record.amount))}
                     </TableCell>
@@ -295,7 +291,7 @@ export function FundingTable({ state, grantTypeId }: FundingTableProps) {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   No funding records found. Add data to get started.
                 </TableCell>
               </TableRow>
