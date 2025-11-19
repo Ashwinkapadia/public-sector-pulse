@@ -25,6 +25,7 @@ interface FundingRecord {
   date_range_end: string | null;
   notes: string | null;
   grant_type_id: string | null;
+  cfda_code: string | null;
   organizations: Organization;
   verticals: Vertical;
   grant_types?: {
@@ -32,6 +33,7 @@ interface FundingRecord {
     name: string;
     description: string | null;
     federal_agency: string | null;
+    cfda_code: string | null;
   } | null;
 }
 

@@ -204,6 +204,7 @@ export function FundingTable({ state, grantTypeId }: FundingTableProps) {
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
+              <TableHead>CFDA Code</TableHead>
               <TableHead>Grant Type</TableHead>
               <TableHead>
                 <Button
@@ -255,6 +256,11 @@ export function FundingTable({ state, grantTypeId }: FundingTableProps) {
                       <Badge variant="secondary">{record.verticals.name}</Badge>
                     </TableCell>
                     <TableCell>
+                      {record.cfda_code || record.grant_types?.cfda_code || (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       {record.grant_types ? (
                         <Badge variant="outline" className="text-xs">
                           {record.grant_types.name}
@@ -291,7 +297,7 @@ export function FundingTable({ state, grantTypeId }: FundingTableProps) {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
                   No funding records found. Add data to get started.
                 </TableCell>
               </TableRow>

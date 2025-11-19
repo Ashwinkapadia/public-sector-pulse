@@ -6,6 +6,8 @@ export interface GrantType {
   name: string;
   description: string | null;
   federal_agency: string | null;
+  cfda_code: string | null;
+  grant_type: string | null;
   created_at: string;
 }
 
