@@ -1,5 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { StateSelector } from "@/components/StateSelector";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { DateRangeSlider } from "@/components/DateRangeSlider";
 import { FundingMetrics } from "@/components/FundingMetrics";
 import { FundingChart } from "@/components/FundingChart";
@@ -11,6 +16,49 @@ const Index = () => {
   const [selectedState, setSelectedState] = useState<string>();
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Check if user is authenticated
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate("/auth");
+      }
+      setLoading(false);
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to log out",
+      });
+    } else {
+      navigate("/auth");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -25,8 +73,19 @@ const Index = () => {
                 Government Funding Intelligence
               </h1>
             </div>
-            <div className="text-sm text-muted-foreground">
-              Public Sector Dashboard
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-muted-foreground">
+                Public Sector Dashboard
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>
