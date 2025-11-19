@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { StateSelector } from "@/components/StateSelector";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, RefreshCw, Trash2, Save, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DateRangeSlider } from "@/components/DateRangeSlider";
 import { FundingMetrics } from "@/components/FundingMetrics";
@@ -11,7 +11,10 @@ import { FundingChart } from "@/components/FundingChart";
 import { FundingTable } from "@/components/FundingTable";
 import { DataSources } from "@/components/DataSources";
 import { BonterraLogo } from "@/components/BonterraLogo";
-import { RefreshCw } from "lucide-react";
+import { useSavedSearches, useSaveSearch, useDeleteSearch } from "@/hooks/useSavedSearches";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const Index = () => {
   const [selectedState, setSelectedState] = useState<string>();
@@ -19,8 +22,14 @@ const Index = () => {
   const [endDate, setEndDate] = useState<Date>();
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
+  const [fetchingNASBO, setFetchingNASBO] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [searchName, setSearchName] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { data: savedSearches } = useSavedSearches();
+  const saveSearchMutation = useSaveSearch();
+  const deleteSearchMutation = useDeleteSearch();
 
   useEffect(() => {
     // Check if user is authenticated
@@ -54,7 +63,7 @@ const Index = () => {
     }
   };
 
-  const handleFetchData = async () => {
+  const handleFetchUSASpendingData = async () => {
     if (!selectedState) {
       toast({
         variant: "destructive",
@@ -93,6 +102,146 @@ const Index = () => {
       });
     } finally {
       setFetching(false);
+    }
+  };
+
+  const handleFetchNASBOData = async () => {
+    if (!selectedState) {
+      toast({
+        variant: "destructive",
+        title: "State Required",
+        description: "Please select a state before fetching data",
+      });
+      return;
+    }
+
+    setFetchingNASBO(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("fetch-nasbo-data", {
+        body: {
+          state: selectedState,
+          startDate: startDate?.toISOString().split("T")[0],
+          endDate: endDate?.toISOString().split("T")[0],
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success!",
+        description: `Fetched ${data?.recordsCreated || 0} NASBO budget records`,
+      });
+
+      // Refresh the page data
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Error fetching NASBO data:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to fetch NASBO data",
+        description: error.message || "An error occurred while fetching NASBO data",
+      });
+    } finally {
+      setFetchingNASBO(false);
+    }
+  };
+
+  const handleClearFilters = () => {
+    setSelectedState(undefined);
+    setStartDate(undefined);
+    setEndDate(undefined);
+    toast({
+      title: "Filters cleared",
+      description: "All filters have been reset",
+    });
+  };
+
+  const handleClearData = async () => {
+    try {
+      const { error } = await supabase
+        .from("funding_records")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all records
+
+      if (error) throw error;
+
+      toast({
+        title: "Data cleared",
+        description: "All funding records have been removed",
+      });
+
+      window.location.reload();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Failed to clear data",
+        description: error.message || "An error occurred while clearing data",
+      });
+    }
+  };
+
+  const handleSaveSearch = async () => {
+    if (!searchName.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Name required",
+        description: "Please enter a name for this search",
+      });
+      return;
+    }
+
+    try {
+      await saveSearchMutation.mutateAsync({
+        name: searchName,
+        state: selectedState,
+        start_date: startDate?.toISOString().split("T")[0],
+        end_date: endDate?.toISOString().split("T")[0],
+        source: 'USAspending',
+      });
+
+      toast({
+        title: "Search saved",
+        description: "Your search has been saved successfully",
+      });
+
+      setSaveDialogOpen(false);
+      setSearchName("");
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Failed to save search",
+        description: error.message || "An error occurred while saving the search",
+      });
+    }
+  };
+
+  const handleLoadSearch = (searchId: string) => {
+    const search = savedSearches?.find(s => s.id === searchId);
+    if (search) {
+      setSelectedState(search.state || undefined);
+      setStartDate(search.start_date ? new Date(search.start_date) : undefined);
+      setEndDate(search.end_date ? new Date(search.end_date) : undefined);
+      toast({
+        title: "Search loaded",
+        description: `Loaded search: ${search.name}`,
+      });
+    }
+  };
+
+  const handleDeleteSearch = async (searchId: string) => {
+    try {
+      await deleteSearchMutation.mutateAsync(searchId);
+      toast({
+        title: "Search deleted",
+        description: "Your saved search has been deleted",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Failed to delete search",
+        description: error.message || "An error occurred while deleting the search",
+      });
     }
   };
 
@@ -137,12 +286,78 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
+        {/* Action Buttons */}
+        <section className="mb-6">
+          <div className="flex gap-3 justify-end">
+            <Button
+              onClick={handleClearFilters}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Clear Filters
+            </Button>
+            <Button
+              onClick={handleClearData}
+              variant="destructive"
+              size="sm"
+              className="gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Clear All Data
+            </Button>
+            <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Save className="h-4 w-4" />
+                  Save Search
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Save Current Search</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <Input
+                    placeholder="Enter search name..."
+                    value={searchName}
+                    onChange={(e) => setSearchName(e.target.value)}
+                  />
+                  <Button onClick={handleSaveSearch} className="w-full">
+                    Save
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </section>
+
         {/* Filters Section */}
         <section className="mb-8">
           <div className="bg-card rounded-lg border p-6">
-            <h2 className="text-lg font-semibold mb-6 text-foreground">
-              Filter Data
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-foreground">
+                Filter Data
+              </h2>
+              {savedSearches && savedSearches.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <Select onValueChange={handleLoadSearch}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Load saved search" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {savedSearches.map((search) => (
+                        <SelectItem key={search.id} value={search.id}>
+                          {search.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
                 <label className="text-sm font-medium mb-2 block">
@@ -160,15 +375,25 @@ const Index = () => {
                 onEndDateChange={setEndDate}
               />
             </div>
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex gap-3 justify-end">
               <Button
-                onClick={handleFetchData}
+                onClick={handleFetchUSASpendingData}
                 disabled={fetching || !selectedState}
                 className="gap-2"
                 size="lg"
               >
                 <RefreshCw className={`h-4 w-4 ${fetching ? "animate-spin" : ""}`} />
-                {fetching ? "Fetching Data..." : "Fetch Data from USAspending.gov"}
+                {fetching ? "Fetching..." : "Fetch USAspending.gov"}
+              </Button>
+              <Button
+                onClick={handleFetchNASBOData}
+                disabled={fetchingNASBO || !selectedState}
+                className="gap-2"
+                size="lg"
+                variant="secondary"
+              >
+                <RefreshCw className={`h-4 w-4 ${fetchingNASBO ? "animate-spin" : ""}`} />
+                {fetchingNASBO ? "Fetching..." : "Fetch NASBO Data"}
               </Button>
             </div>
           </div>

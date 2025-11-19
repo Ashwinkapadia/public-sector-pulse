@@ -24,6 +24,7 @@ export type Database = {
           id: string
           notes: string | null
           organization_id: string
+          source: string
           status: string
           updated_at: string
           vertical_id: string
@@ -37,6 +38,7 @@ export type Database = {
           id?: string
           notes?: string | null
           organization_id: string
+          source?: string
           status?: string
           updated_at?: string
           vertical_id: string
@@ -50,6 +52,7 @@ export type Database = {
           id?: string
           notes?: string | null
           organization_id?: string
+          source?: string
           status?: string
           updated_at?: string
           vertical_id?: string
@@ -191,6 +194,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      saved_searches: {
+        Row: {
+          created_at: string | null
+          end_date: string | null
+          id: string
+          name: string
+          source: string | null
+          start_date: string | null
+          state: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          source?: string | null
+          start_date?: string | null
+          state?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          source?: string | null
+          start_date?: string | null
+          state?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
