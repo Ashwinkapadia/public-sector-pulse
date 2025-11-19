@@ -23,16 +23,21 @@ export function FundingChart({ state }: FundingChartProps) {
   const chartData = useMemo(() => {
     if (!fundingRecords || !verticals) return [];
 
+    // Initialize map with all verticals
     const verticalMap = new Map<string, { funding: number; organizations: Set<string> }>();
+    
+    verticals.forEach((vertical) => {
+      verticalMap.set(vertical.name, { funding: 0, organizations: new Set() });
+    });
 
+    // Add funding data for verticals that have records
     fundingRecords.forEach((record) => {
       const verticalName = record.verticals.name;
-      if (!verticalMap.has(verticalName)) {
-        verticalMap.set(verticalName, { funding: 0, organizations: new Set() });
+      const entry = verticalMap.get(verticalName);
+      if (entry) {
+        entry.funding += Number(record.amount) / 1_000_000; // Convert to millions
+        entry.organizations.add(record.organization_id);
       }
-      const entry = verticalMap.get(verticalName)!;
-      entry.funding += Number(record.amount) / 1_000_000; // Convert to millions
-      entry.organizations.add(record.organization_id);
     });
 
     return Array.from(verticalMap.entries()).map(([name, data]) => ({

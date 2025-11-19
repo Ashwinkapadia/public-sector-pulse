@@ -159,16 +159,25 @@ const Index = () => {
 
   const handleClearData = async () => {
     try {
-      const { error } = await supabase
+      // Delete funding records first (due to foreign key constraints)
+      const { error: fundingError } = await supabase
         .from("funding_records")
         .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all records
+        .neq("id", "00000000-0000-0000-0000-000000000000");
 
-      if (error) throw error;
+      if (fundingError) throw fundingError;
+
+      // Delete organizations
+      const { error: orgError } = await supabase
+        .from("organizations")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (orgError) throw orgError;
 
       toast({
         title: "Data cleared",
-        description: "All funding records have been removed",
+        description: "All funding records and organizations have been removed",
       });
 
       window.location.reload();
