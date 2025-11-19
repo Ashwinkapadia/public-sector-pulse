@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -11,7 +12,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFundingRecords } from "@/hooks/useFundingData";
-import { ArrowUpDown, Download } from "lucide-react";
+import { useRepAssignments } from "@/hooks/useRepAssignments";
+import { ArrowUpDown, Download, ExternalLink } from "lucide-react";
 import * as XLSX from "xlsx";
 
 interface FundingTableProps {
@@ -23,8 +25,14 @@ type SortOrder = "asc" | "desc";
 
 export function FundingTable({ state }: FundingTableProps) {
   const { data: fundingRecords, isLoading } = useFundingRecords(state);
+  const { data: assignments } = useRepAssignments();
   const [sortField, setSortField] = useState<SortField>("funding");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
+  const assignmentMap = useMemo(() => {
+    if (!assignments) return new Map();
+    return new Map(assignments.map(a => [a.organization_id, a]));
+  }, [assignments]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -220,34 +228,55 @@ export function FundingTable({ state }: FundingTableProps) {
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
+              <TableHead>Assigned Rep</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedRecords && sortedRecords.length > 0 ? (
-              sortedRecords.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell className="font-medium">
-                    {record.organizations.name}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{record.verticals.name}</Badge>
-                  </TableCell>
-                  <TableCell className="font-semibold">
-                    {formatCurrency(Number(record.amount))}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className="bg-accent text-accent-foreground">
-                      {record.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {record.organizations.last_updated || "N/A"}
-                  </TableCell>
-                </TableRow>
-              ))
+              sortedRecords.map((record) => {
+                const assignment = assignmentMap.get(record.organization_id);
+                return (
+                  <TableRow key={record.id}>
+                    <TableCell className="font-medium">
+                      {record.organizations.name}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{record.verticals.name}</Badge>
+                    </TableCell>
+                    <TableCell className="font-semibold">
+                      {formatCurrency(Number(record.amount))}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className="bg-accent text-accent-foreground">
+                        {record.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {record.organizations.last_updated || "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      {assignment ? (
+                        <span className="text-sm">
+                          {assignment.profiles.display_name || assignment.profiles.email}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Unassigned</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Link to={`/organization/${record.organization_id}`}>
+                        <Button variant="ghost" size="sm">
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No funding records found. Add data to get started.
                 </TableCell>
               </TableRow>

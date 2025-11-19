@@ -73,27 +73,153 @@ export type Database = {
       }
       organizations: {
         Row: {
+          address: string | null
+          annual_revenue: number | null
+          city: string | null
           created_at: string
+          description: string | null
+          employee_count: number | null
           id: string
+          industry: string | null
           last_updated: string | null
           name: string
           state: string
+          website: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          annual_revenue?: number | null
+          city?: string | null
+          created_at?: string
+          description?: string | null
+          employee_count?: number | null
+          id?: string
+          industry?: string | null
+          last_updated?: string | null
+          name: string
+          state: string
+          website?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          annual_revenue?: number | null
+          city?: string | null
+          created_at?: string
+          description?: string | null
+          employee_count?: number | null
+          id?: string
+          industry?: string | null
+          last_updated?: string | null
+          name?: string
+          state?: string
+          website?: string | null
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rep_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          rep_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          rep_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          rep_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rep_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rep_assignments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rep_assignments_rep_id_fkey"
+            columns: ["rep_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          last_updated?: string | null
-          name: string
-          state: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }
         Update: {
           created_at?: string
           id?: string
-          last_updated?: string | null
-          name?: string
-          state?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       verticals: {
         Row: {
@@ -121,10 +247,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "rep"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -251,6 +383,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "rep"],
+    },
   },
 } as const
