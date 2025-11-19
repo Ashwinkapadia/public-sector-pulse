@@ -66,7 +66,7 @@ serve(async (req) => {
                 end_date: endDate || `${fiscalYear}-12-31`,
               },
             ],
-            award_type_codes: ["02", "03", "04", "05", "06", "07", "08", "09", "10", "11"],
+            award_type_codes: ["02", "03", "04", "05"],
           },
           fields: [
             "Award ID",
