@@ -7,6 +7,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper function to format currency
+const formatAmount = (amount: number) => {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(amount);
+};
+
 interface RequestBody {
   state: string;
   startDate?: string;
@@ -314,30 +324,44 @@ serve(async (req) => {
           if (fundingRecord && awardAmount > 50000) {
             const numSubawards = Math.floor(Math.random() * 3) + 1; // 1-3 subawards
             const subawardAmount = (awardAmount * 0.25) / numSubawards;
+            console.log(`Creating ${numSubawards} subawards for ${recipientName} (${formatAmount(awardAmount)})`);
 
             for (let i = 0; i < numSubawards; i++) {
-              // Create or get subaward recipient organization
-              const subawardOrgName = `${recipientName} - Subrecipient ${i + 1}`;
-              const { data: subOrg } = await supabaseClient
-                .from("organizations")
-                .upsert({
-                  name: subawardOrgName,
-                  state: state,
-                  last_updated: new Date().toISOString().split("T")[0],
-                }, { onConflict: "name,state" })
-                .select()
-                .single();
+              try {
+                // Create or get subaward recipient organization
+                const subawardOrgName = `${recipientName} - Subrecipient ${i + 1}`;
+                const { data: subOrg, error: subOrgError } = await supabaseClient
+                  .from("organizations")
+                  .upsert({
+                    name: subawardOrgName,
+                    state: state,
+                    last_updated: new Date().toISOString().split("T")[0],
+                  }, { onConflict: "name,state" })
+                  .select()
+                  .single();
 
-              if (subOrg) {
-                await supabaseClient
-                  .from("subawards")
-                  .insert({
-                    funding_record_id: fundingRecord.id,
-                    recipient_organization_id: subOrg.id,
-                    amount: subawardAmount,
-                    award_date: startDateStr || new Date().toISOString().split("T")[0],
-                    description: `Subaward for ${cfdaTitle || verticalName} program`,
-                  });
+                if (subOrgError) {
+                  console.error(`Error creating subaward organization: ${subOrgError.message}`);
+                  continue;
+                }
+
+                if (subOrg) {
+                  const { error: subawardError } = await supabaseClient
+                    .from("subawards")
+                    .insert({
+                      funding_record_id: fundingRecord.id,
+                      recipient_organization_id: subOrg.id,
+                      amount: subawardAmount,
+                      award_date: startDateStr || new Date().toISOString().split("T")[0],
+                      description: `Subaward for ${cfdaTitle || verticalName} program`,
+                    });
+
+                  if (subawardError) {
+                    console.error(`Error creating subaward: ${subawardError.message}`);
+                  }
+                }
+              } catch (error) {
+                console.error("Error in subaward creation:", error);
               }
             }
           }
@@ -347,7 +371,12 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Successfully added ${recordsAdded} funding records`);
+    // Count subawards created
+    const { count: subawardCount } = await supabaseClient
+      .from("subawards")
+      .select("*", { count: "exact", head: true });
+
+    console.log(`Successfully added ${recordsAdded} funding records and ${subawardCount || 0} subawards`);
 
     return new Response(
       JSON.stringify({
