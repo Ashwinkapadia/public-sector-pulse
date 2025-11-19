@@ -68,10 +68,13 @@ serve(async (req) => {
     console.log("Grants.gov API response:", JSON.stringify(grantsData).substring(0, 500));
     console.log(`Received ${grantsData.oppHits?.length || 0} opportunities from Grants.gov`);
 
-    if (!grantsData.oppHits || grantsData.oppHits.length === 0) {
+    const oppHits = grantsData.data?.oppHits ?? [];
+    console.log(`Grants.gov hitCount: ${grantsData.data?.hitCount}, oppHits length: ${oppHits.length}`);
+
+    if (oppHits.length === 0) {
       return new Response(
         JSON.stringify({ 
-          message: "No grant opportunities found for the specified criteria",
+          message: "No grant opportunities returned from Grants.gov for the current query",
           recordsAdded: 0 
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -94,7 +97,7 @@ serve(async (req) => {
     let subawardsCreated = 0;
 
     // Process each grant opportunity
-    for (const opportunity of grantsData.oppHits) {
+    for (const opportunity of oppHits) {
       try {
         const oppNumber = opportunity.number || opportunity.id;
         const oppTitle = opportunity.title || "Untitled Grant";
