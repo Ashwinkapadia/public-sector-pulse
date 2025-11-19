@@ -121,8 +121,15 @@ serve(async (req) => {
 
           if (detailResponse.ok) {
             const detailData = await detailResponse.json();
-            const awardCeiling = detailData.data?.synopsis?.awardCeiling ?? detailData.data?.synopsis?.awardCeilingFormatted;
-            const parsedAmount = parseFloat(awardCeiling ?? "0");
+            const synopsis = detailData.data?.synopsis;
+            const amountString =
+              synopsis?.awardCeiling ??
+              synopsis?.awardCeilingFormatted ??
+              synopsis?.awardFloor ??
+              synopsis?.awardFloorFormatted ??
+              "0";
+
+            const parsedAmount = parseFloat(amountString);
             if (!Number.isNaN(parsedAmount)) {
               awardAmount = parsedAmount;
             }
