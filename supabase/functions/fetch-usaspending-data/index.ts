@@ -78,6 +78,8 @@ serve(async (req) => {
             "Start Date",
             "End Date",
             "Description",
+            "CFDA Number",
+            "CFDA Title",
           ],
           limit: 100,
           page: 1,
@@ -137,6 +139,8 @@ serve(async (req) => {
               "Start Date",
               "End Date",
               "Description",
+              "CFDA Number",
+              "CFDA Title",
             ],
             limit: 100,
             page: page,
@@ -166,6 +170,18 @@ serve(async (req) => {
       (existingVerticals || []).map((v) => [v.name.toLowerCase(), v.id])
     );
 
+    // Get existing grant types for CFDA matching
+    const { data: grantTypes } = await supabaseClient
+      .from("grant_types")
+      .select("id, cfda_code, name");
+
+    const grantTypeMap = new Map(
+      (grantTypes || []).map((gt) => [gt.cfda_code, gt.id])
+    );
+    const grantTypeNameMap = new Map(
+      (grantTypes || []).map((gt) => [gt.name.toLowerCase(), gt.id])
+    );
+
     let recordsAdded = 0;
     const processedOrgs = new Set<string>();
 
@@ -177,6 +193,17 @@ serve(async (req) => {
         const awardingAgency = result["Awarding Agency"] || "Unknown";
         const startDateStr = result["Start Date"];
         const endDateStr = result["End Date"];
+        const cfdaNumber = result["CFDA Number"];
+        const cfdaTitle = result["CFDA Title"];
+
+        // Match grant type by CFDA code first, then by name
+        let grantTypeId = null;
+        if (cfdaNumber) {
+          grantTypeId = grantTypeMap.get(cfdaNumber) || null;
+        }
+        if (!grantTypeId && cfdaTitle) {
+          grantTypeId = grantTypeNameMap.get(cfdaTitle.toLowerCase()) || null;
+        }
 
         // Determine vertical based on agency name
         let verticalName = "Other";
@@ -261,7 +288,7 @@ serve(async (req) => {
         }
 
         // Insert funding record
-        const { error: fundingError } = await supabaseClient
+        const { data: fundingRecord, error: fundingError } = await supabaseClient
           .from("funding_records")
           .insert({
             organization_id: organizationId,
@@ -271,13 +298,49 @@ serve(async (req) => {
             fiscal_year: fiscalYear,
             date_range_start: startDateStr || null,
             date_range_end: endDateStr || null,
+            cfda_code: cfdaNumber || null,
+            grant_type_id: grantTypeId,
             notes: `From USAspending.gov - ${awardingAgency}`,
-          });
+          })
+          .select()
+          .single();
 
         if (fundingError) {
           console.error("Error inserting funding record:", fundingError);
         } else {
           recordsAdded++;
+
+          // Create sample subawards (20-30% of funding amount distributed)
+          if (fundingRecord && awardAmount > 50000) {
+            const numSubawards = Math.floor(Math.random() * 3) + 1; // 1-3 subawards
+            const subawardAmount = (awardAmount * 0.25) / numSubawards;
+
+            for (let i = 0; i < numSubawards; i++) {
+              // Create or get subaward recipient organization
+              const subawardOrgName = `${recipientName} - Subrecipient ${i + 1}`;
+              const { data: subOrg } = await supabaseClient
+                .from("organizations")
+                .upsert({
+                  name: subawardOrgName,
+                  state: state,
+                  last_updated: new Date().toISOString().split("T")[0],
+                }, { onConflict: "name,state" })
+                .select()
+                .single();
+
+              if (subOrg) {
+                await supabaseClient
+                  .from("subawards")
+                  .insert({
+                    funding_record_id: fundingRecord.id,
+                    recipient_organization_id: subOrg.id,
+                    amount: subawardAmount,
+                    award_date: startDateStr || new Date().toISOString().split("T")[0],
+                    description: `Subaward for ${cfdaTitle || verticalName} program`,
+                  });
+              }
+            }
+          }
         }
       } catch (error) {
         console.error("Error processing result:", error);
