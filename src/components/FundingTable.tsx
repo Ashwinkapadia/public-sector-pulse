@@ -228,7 +228,7 @@ export function FundingTable({ state }: FundingTableProps) {
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
-              <TableHead>Assigned Rep</TableHead>
+              <TableHead>Source</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -256,13 +256,9 @@ export function FundingTable({ state }: FundingTableProps) {
                       {record.organizations.last_updated || "N/A"}
                     </TableCell>
                     <TableCell>
-                      {assignment ? (
-                        <span className="text-sm">
-                          {assignment.profiles.display_name || assignment.profiles.email}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Unassigned</span>
-                      )}
+                      <Badge variant="outline">
+                        {(record as any).source || 'USAspending'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Link to={`/organization/${record.organization_id}`}>
