@@ -69,10 +69,27 @@ Deno.serve(async (req) => {
       },
     ];
 
+    // Get or create verticals
+    const { data: verticals } = await supabase
+      .from('verticals')
+      .select('id, name');
+    
+    // Get existing grant types for matching
+    const { data: grantTypes } = await supabase
+      .from('grant_types')
+      .select('id, cfda_code, name');
+
+    const grantTypeMap = new Map(
+      (grantTypes || []).map((gt) => [gt.name.toLowerCase(), gt.id])
+    );
+
     let recordsCreated = 0;
 
     // Get or create vertical and organization for each budget category
     for (const item of nasboData) {
+      // Match grant type by category name
+      const grantTypeId = grantTypeMap.get(item.category.toLowerCase()) || null;
+
       // Get or create vertical
       let { data: vertical } = await supabase
         .from('verticals')
@@ -127,6 +144,7 @@ Deno.serve(async (req) => {
             status: 'Active',
             notes: item.description,
             source: 'NASBO',
+            grant_type_id: grantTypeId,
             date_range_start: startDate || '2024-01-01',
             date_range_end: endDate || '2024-12-31',
           })
