@@ -79,7 +79,7 @@ serve(async (req) => {
             "End Date",
             "Description",
           ],
-          limit: 500,
+          limit: 100,
           page: 1,
           order: "desc",
           sort: "Award Amount",
@@ -98,7 +98,10 @@ serve(async (req) => {
 
     // Fetch additional pages if available
     let allResults = searchData.results || [];
-    const totalPages = Math.min(Math.ceil((searchData.page_metadata?.total || 0) / 500), 5); // Limit to 5 pages (2500 records max)
+    const totalPages = Math.min(
+      Math.ceil((searchData.page_metadata?.total || 0) / 100),
+      5
+    ); // Limit to 5 pages (max 500 records)
 
     for (let page = 2; page <= totalPages; page++) {
       const pageResponse = await fetch(
@@ -135,7 +138,7 @@ serve(async (req) => {
               "End Date",
               "Description",
             ],
-            limit: 500,
+            limit: 100,
             page: page,
             order: "desc",
             sort: "Award Amount",
@@ -146,7 +149,9 @@ serve(async (req) => {
       if (pageResponse.ok) {
         const pageData = await pageResponse.json();
         allResults = allResults.concat(pageData.results || []);
-        console.log(`Found ${pageData.results?.length || 0} results from page ${page}`);
+        console.log(
+          `Found ${pageData.results?.length || 0} results from page ${page}`,
+        );
       }
     }
 
