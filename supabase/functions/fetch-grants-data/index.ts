@@ -37,36 +37,27 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Fetch data from Grants.gov API
-    const grantsUrl = new URL("https://api.grants.gov/v1/api/search2");
-    
-    // Build query parameters
-    const params: Record<string, string> = {
-      rows: "50", // Fetch 50 opportunities
+    // Fetch data from Grants.gov API using POST as documented for search2
+    const requestBody: Record<string, unknown> = {
+      rows: 50, // Fetch 50 opportunities
       oppStatuses: "forecasted|posted", // Get active opportunities
     };
 
-    if (startDate && endDate) {
-      params.postedFrom = startDate;
-      params.postedTo = endDate;
+    // Grants.gov search2 does not support explicit state or date filters,
+    // so we pass the selected state as a keyword to bias results.
+    if (state) {
+      requestBody.keyword = state;
     }
 
-    Object.entries(params).forEach(([key, value]) => {
-      grantsUrl.searchParams.append(key, value);
-    });
+    console.log("Fetching from Grants.gov with body:", JSON.stringify(requestBody));
 
-    console.log("Fetching from Grants.gov:", grantsUrl.toString());
-
-    const apiKey = Deno.env.get("GRANTS_GOV_API_KEY");
-    if (!apiKey) {
-      throw new Error("GRANTS_GOV_API_KEY is not configured");
-    }
-
-    const grantsResponse = await fetch(grantsUrl.toString(), {
+    const grantsResponse = await fetch("https://api.grants.gov/v1/api/search2", {
+      method: "POST",
       headers: {
-        "Accept": "application/json",
-        "X-Api-Key": apiKey,
+        "Content-Type": "application/json",
+        Accept: "application/json",
       },
+      body: JSON.stringify(requestBody),
     });
 
     if (!grantsResponse.ok) {
