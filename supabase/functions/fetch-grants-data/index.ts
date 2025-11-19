@@ -43,11 +43,9 @@ serve(async (req) => {
       oppStatuses: "forecasted|posted", // Get active opportunities
     };
 
-    // Grants.gov search2 does not support explicit state or date filters,
-    // so we pass the selected state as a keyword to bias results.
-    if (state) {
-      requestBody.keyword = state;
-    }
+    // Grants.gov search2 does not support explicit state filtering,
+    // so we fetch all opportunities without state keyword filtering
+    // Users can filter by state in the UI after fetching
 
     console.log("Fetching from Grants.gov with body:", JSON.stringify(requestBody));
 
@@ -61,10 +59,13 @@ serve(async (req) => {
     });
 
     if (!grantsResponse.ok) {
+      const errorText = await grantsResponse.text();
+      console.error(`Grants.gov API error: ${grantsResponse.status} - ${errorText}`);
       throw new Error(`Grants.gov API error: ${grantsResponse.status} ${grantsResponse.statusText}`);
     }
 
     const grantsData = await grantsResponse.json();
+    console.log("Grants.gov API response:", JSON.stringify(grantsData).substring(0, 500));
     console.log(`Received ${grantsData.oppHits?.length || 0} opportunities from Grants.gov`);
 
     if (!grantsData.oppHits || grantsData.oppHits.length === 0) {
