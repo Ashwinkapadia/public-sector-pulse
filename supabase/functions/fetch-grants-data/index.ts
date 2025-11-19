@@ -94,40 +94,43 @@ serve(async (req) => {
     const grantTypeMap = new Map(grantTypes?.map((gt) => [gt.name.toLowerCase(), gt.id]));
     
     let recordsAdded = 0;
-    let subawardsCreated = 0;
 
     // Process each grant opportunity
     for (const opportunity of oppHits) {
       try {
+        console.log(`Raw opportunity data:`, JSON.stringify(opportunity).substring(0, 300));
+        
         const oppNumber = opportunity.number || opportunity.id;
         const oppTitle = opportunity.title || "Untitled Grant";
         const agency = opportunity.agencyName || "Unknown Agency";
-        const category = opportunity.categoryName || "General";
-        const awardAmount = parseFloat(opportunity.awardCeiling) || 0;
-        const fiscalYear = new Date(opportunity.postedDate || Date.now()).getFullYear();
+        
+        // Grants.gov doesn't provide funding category in basic search, use fundingInstruments or default
+        const fundingInstrument = opportunity.fundingInstruments?.[0] || "Grant";
+        
+        // No award ceiling in basic search results - would need fetchOpportunity for details
+        const awardAmount = 0; // Not available in search results
+        
+        // Parse date
+        const postedDate = opportunity.openDate || opportunity.postDate;
+        const fiscalYear = postedDate ? new Date(postedDate).getFullYear() : new Date().getFullYear();
+        
+        // Get CFDA/ALN number
+        const cfdaNumber = opportunity.alnist?.[0] || opportunity.aln || null;
 
-        console.log(`Processing grant: ${oppNumber} - ${oppTitle}`);
+        console.log(`Processing grant: ${oppNumber} - ${oppTitle} (Agency: ${agency}, CFDA: ${cfdaNumber})`);
 
-        // Determine vertical (using category)
-        let verticalId = verticalMap.get(category.toLowerCase());
+        // Determine vertical - default to "Other" since basic search doesn't have category
+        let verticalId = verticalMap.get("other");
+
         if (!verticalId) {
-          verticalId = verticalMap.get("other");
-        }
-
-        if (!verticalId) {
-          console.log(`Skipping ${oppNumber}: No matching vertical found`);
+          console.log(`Skipping ${oppNumber}: No 'Other' vertical found in database`);
           continue;
         }
 
-        // Determine grant type
-        let grantTypeId = grantTypeMap.get("grant");
-        
-        // Check if opportunity mentions specific grant type keywords
-        const titleLower = oppTitle.toLowerCase();
-        if (titleLower.includes("cooperative agreement")) {
-          grantTypeId = grantTypeMap.get("cooperative agreement");
-        } else if (titleLower.includes("contract")) {
-          grantTypeId = grantTypeMap.get("contract");
+        // Determine grant type based on funding instrument
+        let grantTypeId = grantTypeMap.get(fundingInstrument.toLowerCase());
+        if (!grantTypeId) {
+          grantTypeId = grantTypeMap.get("grant");
         }
 
         // Create or get organization (using agency as organization)
@@ -170,8 +173,8 @@ serve(async (req) => {
             amount: awardAmount,
             fiscal_year: fiscalYear,
             source: "Grants.gov",
-            cfda_code: opportunity.cfdaNumber || null,
-            date_range_start: opportunity.postedDate || null,
+            cfda_code: cfdaNumber,
+            date_range_start: postedDate || null,
             date_range_end: opportunity.closeDate || null,
             notes: `${oppTitle} (${oppNumber})`,
           })
@@ -185,62 +188,19 @@ serve(async (req) => {
 
         recordsAdded++;
 
-        // Create sample subawards for larger grants
-        if (fundingRecord && awardAmount > 100000) {
-          const numSubawards = Math.floor(Math.random() * 2) + 1; // 1-2 subawards
-          const subawardAmount = (awardAmount * 0.3) / numSubawards;
-          
-          for (let i = 0; i < numSubawards; i++) {
-            try {
-              const subawardOrgName = `${agency} - Grant Recipient ${i + 1}`;
-              
-              const { data: subOrg, error: subOrgError } = await supabaseClient
-                .from("organizations")
-                .upsert({
-                  name: subawardOrgName,
-                  state: state,
-                  last_updated: new Date().toISOString().split("T")[0],
-                }, { onConflict: "name,state" })
-                .select()
-                .single();
-
-              if (subOrgError) {
-                console.error(`Error creating subaward organization:`, subOrgError);
-                continue;
-              }
-
-              if (subOrg) {
-                const { error: subawardError } = await supabaseClient
-                  .from("subawards")
-                  .insert({
-                    funding_record_id: fundingRecord.id,
-                    recipient_organization_id: subOrg.id,
-                    amount: subawardAmount,
-                    award_date: opportunity.postedDate || new Date().toISOString().split("T")[0],
-                    description: `Subaward for ${oppTitle}`,
-                  });
-
-                if (!subawardError) {
-                  subawardsCreated++;
-                }
-              }
-            } catch (error) {
-              console.error("Error in subaward creation:", error);
-            }
-          }
-        }
+        // Note: Award amounts not available in basic search results
+        // Would need to call fetchOpportunity endpoint for each grant to get full details
       } catch (error) {
         console.error("Error processing opportunity:", error);
       }
     }
 
-    console.log(`Successfully added ${recordsAdded} funding records and ${subawardsCreated} subawards from Grants.gov`);
+    console.log(`Successfully added ${recordsAdded} funding records from Grants.gov`);
 
     return new Response(
       JSON.stringify({
         success: true,
         recordsAdded,
-        subawardsCreated,
         message: `Successfully fetched ${recordsAdded} grant opportunities from Grants.gov`,
       }),
       {
