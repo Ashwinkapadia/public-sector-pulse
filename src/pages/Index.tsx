@@ -11,12 +11,14 @@ import { FundingChart } from "@/components/FundingChart";
 import { FundingTable } from "@/components/FundingTable";
 import { DataSources } from "@/components/DataSources";
 import { BonterraLogo } from "@/components/BonterraLogo";
+import { RefreshCw } from "lucide-react";
 
 const Index = () => {
   const [selectedState, setSelectedState] = useState<string>();
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -49,6 +51,48 @@ const Index = () => {
       });
     } else {
       navigate("/auth");
+    }
+  };
+
+  const handleFetchData = async () => {
+    if (!selectedState) {
+      toast({
+        variant: "destructive",
+        title: "State Required",
+        description: "Please select a state before fetching data",
+      });
+      return;
+    }
+
+    setFetching(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("fetch-usaspending-data", {
+        body: {
+          state: selectedState,
+          startDate: startDate?.toISOString().split("T")[0],
+          endDate: endDate?.toISOString().split("T")[0],
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success!",
+        description: `Fetched ${data?.recordsAdded || 0} funding records from USAspending.gov`,
+      });
+
+      // Refresh the page data
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Error fetching data:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to fetch data",
+        description: error.message || "An error occurred while fetching data",
+      });
+    } finally {
+      setFetching(false);
     }
   };
 
@@ -115,6 +159,17 @@ const Index = () => {
                 onStartDateChange={setStartDate}
                 onEndDateChange={setEndDate}
               />
+            </div>
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={handleFetchData}
+                disabled={fetching || !selectedState}
+                className="gap-2"
+                size="lg"
+              >
+                <RefreshCw className={`h-4 w-4 ${fetching ? "animate-spin" : ""}`} />
+                {fetching ? "Fetching Data..." : "Fetch Data from USAspending.gov"}
+              </Button>
             </div>
           </div>
         </section>
