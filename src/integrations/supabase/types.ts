@@ -14,7 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      funding_records: {
+        Row: {
+          amount: number
+          created_at: string
+          date_range_end: string | null
+          date_range_start: string | null
+          fiscal_year: number
+          id: string
+          notes: string | null
+          organization_id: string
+          status: string
+          updated_at: string
+          vertical_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          date_range_end?: string | null
+          date_range_start?: string | null
+          fiscal_year: number
+          id?: string
+          notes?: string | null
+          organization_id: string
+          status?: string
+          updated_at?: string
+          vertical_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          date_range_end?: string | null
+          date_range_start?: string | null
+          fiscal_year?: number
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          vertical_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funding_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funding_records_vertical_id_fkey"
+            columns: ["vertical_id"]
+            isOneToOne: false
+            referencedRelation: "verticals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          last_updated: string | null
+          name: string
+          state: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_updated?: string | null
+          name: string
+          state: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_updated?: string | null
+          name?: string
+          state?: string
+        }
+        Relationships: []
+      }
+      verticals: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
