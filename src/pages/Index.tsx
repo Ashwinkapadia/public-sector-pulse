@@ -16,13 +16,13 @@ import { useSavedSearches, useSaveSearch, useDeleteSearch } from "@/hooks/useSav
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { GrantTypesFilter } from "@/components/GrantTypesFilter";
+import { VerticalsFilter } from "@/components/VerticalsFilter";
 
 const Index = () => {
   const [selectedState, setSelectedState] = useState<string>();
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
-  const [selectedGrantType, setSelectedGrantType] = useState<string | null>(null);
+  const [selectedVerticals, setSelectedVerticals] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [fetchingNASBO, setFetchingNASBO] = useState(false);
@@ -197,7 +197,7 @@ const Index = () => {
     setSelectedState(undefined);
     setStartDate(undefined);
     setEndDate(undefined);
-    setSelectedGrantType(null);
+    setSelectedVerticals([]);
     toast({
       title: "Filters cleared",
       description: "All filters have been reset",
@@ -440,9 +440,9 @@ const Index = () => {
               />
             </div>
             <div className="mt-6">
-              <GrantTypesFilter
-                selectedGrantType={selectedGrantType}
-                onSelectGrantType={setSelectedGrantType}
+              <VerticalsFilter
+                selectedVerticals={selectedVerticals}
+                onSelectVerticals={setSelectedVerticals}
               />
             </div>
             <div className="mt-6 flex gap-3 justify-end flex-wrap">
@@ -491,7 +491,7 @@ const Index = () => {
 
         {/* Organizations Table */}
         <section className="mb-8">
-          <FundingTable state={selectedState} grantTypeId={selectedGrantType} />
+          <FundingTable state={selectedState} verticalIds={selectedVerticals} />
         </section>
 
         {/* Subawards Table */}

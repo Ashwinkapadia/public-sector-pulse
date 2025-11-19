@@ -149,11 +149,64 @@ serve(async (req) => {
 
         console.log(`Processing grant: ${oppNumber} - ${oppTitle} (Agency: ${agency}, CFDA: ${cfdaNumber})`);
 
-        // Determine vertical - default to "Other" since basic search doesn't have category
-        let verticalId = verticalMap.get("other");
+        // Intelligent vertical mapping based on keywords and CFDA codes
+        const titleAndDesc = `${oppTitle} ${opportunity.description || ""}`.toLowerCase();
+        let verticalId: string | undefined;
+
+        // Map based on keywords in title/description
+        if (titleAndDesc.match(/education|school|student|teacher|learning|academic/)) {
+          if (titleAndDesc.match(/higher|college|university|postsecondary/)) {
+            verticalId = verticalMap.get("higher education");
+          } else if (titleAndDesc.match(/k-?12|elementary|secondary|kindergarten/)) {
+            verticalId = verticalMap.get("k-12 education");
+          }
+        } else if (titleAndDesc.match(/workforce|employment|job training|career|apprentice/)) {
+          verticalId = verticalMap.get("workforce development");
+        } else if (titleAndDesc.match(/health|medical|mental health|substance|behavioral/)) {
+          verticalId = verticalMap.get("public health");
+        } else if (titleAndDesc.match(/transportation|transit|highway|infrastructure|road/)) {
+          verticalId = verticalMap.get("transportation");
+        } else if (titleAndDesc.match(/veteran|military|va |armed forces/)) {
+          verticalId = verticalMap.get("veterans");
+        } else if (titleAndDesc.match(/public safety|police|fire|emergency|justice|crime/)) {
+          verticalId = verticalMap.get("public safety");
+        } else if (titleAndDesc.match(/medicaid|medicare/)) {
+          verticalId = verticalMap.get("medicaid");
+        } else if (titleAndDesc.match(/aging|elder|senior|older adult/)) {
+          verticalId = verticalMap.get("aging services");
+        } else if (titleAndDesc.match(/home visit|maternal|infant|early childhood/)) {
+          verticalId = verticalMap.get("home visiting");
+        } else if (titleAndDesc.match(/re-?entry|reintegration|formerly incarcerated|prison release/)) {
+          verticalId = verticalMap.get("re-entry");
+        } else if (titleAndDesc.match(/violence|cvi|community violence/)) {
+          verticalId = verticalMap.get("cvi prevention");
+        }
+
+        // CFDA code mapping (common federal program codes)
+        if (!verticalId && cfdaNumber) {
+          const cfdaPrefix = cfdaNumber.split('.')[0];
+          if (cfdaPrefix === '84') { // Department of Education
+            verticalId = verticalMap.get("k-12 education") || verticalMap.get("higher education");
+          } else if (cfdaPrefix === '93') { // Department of Health and Human Services
+            verticalId = verticalMap.get("public health");
+          } else if (cfdaPrefix === '20') { // Department of Transportation
+            verticalId = verticalMap.get("transportation");
+          } else if (cfdaPrefix === '64') { // VA
+            verticalId = verticalMap.get("veterans");
+          } else if (cfdaPrefix === '17') { // Department of Labor
+            verticalId = verticalMap.get("workforce development");
+          } else if (cfdaPrefix === '16') { // Department of Justice
+            verticalId = verticalMap.get("public safety");
+          }
+        }
+
+        // Default to "Other" if no match
+        if (!verticalId) {
+          verticalId = verticalMap.get("other");
+        }
 
         if (!verticalId) {
-          console.log(`Skipping ${oppNumber}: No 'Other' vertical found in database`);
+          console.log(`Skipping ${oppNumber}: No suitable vertical found in database`);
           continue;
         }
 
@@ -191,6 +244,20 @@ serve(async (req) => {
           }
 
           organizationId = newOrg.id;
+        }
+
+        // Check for existing funding record to prevent duplicates
+        const { data: existingRecord } = await supabaseClient
+          .from("funding_records")
+          .select("id")
+          .eq("organization_id", organizationId)
+          .eq("source", "Grants.gov")
+          .eq("notes", `${oppTitle} (${oppNumber})`)
+          .maybeSingle();
+
+        if (existingRecord) {
+          console.log(`Skipping duplicate grant: ${oppNumber}`);
+          continue;
         }
 
         // Create funding record
