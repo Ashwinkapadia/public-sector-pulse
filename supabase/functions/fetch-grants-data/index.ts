@@ -102,7 +102,7 @@ serve(async (req) => {
         
         const oppNumber = opportunity.number || opportunity.id;
         const oppTitle = opportunity.title || "Untitled Grant";
-        const agency = opportunity.agencyName || "Unknown Agency";
+        const agency = opportunity.agency || "Unknown Agency";
         
         // Grants.gov doesn't provide funding category in basic search, use fundingInstruments or default
         const fundingInstrument = opportunity.fundingInstruments?.[0] || "Grant";
@@ -115,7 +115,7 @@ serve(async (req) => {
         const fiscalYear = postedDate ? new Date(postedDate).getFullYear() : new Date().getFullYear();
         
         // Get CFDA/ALN number
-        const cfdaNumber = opportunity.alnist?.[0] || opportunity.aln || null;
+        const cfdaNumber = opportunity.cfdaList?.[0] || opportunity.cfda || null;
 
         console.log(`Processing grant: ${oppNumber} - ${oppTitle} (Agency: ${agency}, CFDA: ${cfdaNumber})`);
 
