@@ -14,42 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      funding_record_program_models: {
-        Row: {
-          created_at: string
-          funding_record_id: string
-          id: string
-          program_model_id: string
-        }
-        Insert: {
-          created_at?: string
-          funding_record_id: string
-          id?: string
-          program_model_id: string
-        }
-        Update: {
-          created_at?: string
-          funding_record_id?: string
-          id?: string
-          program_model_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "funding_record_program_models_funding_record_id_fkey"
-            columns: ["funding_record_id"]
-            isOneToOne: false
-            referencedRelation: "funding_records"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "funding_record_program_models_program_model_id_fkey"
-            columns: ["program_model_id"]
-            isOneToOne: false
-            referencedRelation: "program_models"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       funding_records: {
         Row: {
           amount: number
@@ -213,30 +177,6 @@ export type Database = {
           email?: string | null
           id?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      program_models: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          model_type: string | null
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          model_type?: string | null
-          name: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          model_type?: string | null
-          name?: string
         }
         Relationships: []
       }
