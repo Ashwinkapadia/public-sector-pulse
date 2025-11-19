@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -8,14 +9,114 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useFundingRecords } from "@/hooks/useFundingData";
+import { ArrowUpDown, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 
 interface FundingTableProps {
   state?: string;
 }
 
+type SortField = "organization" | "vertical" | "funding" | "status" | "lastUpdated";
+type SortOrder = "asc" | "desc";
+
 export function FundingTable({ state }: FundingTableProps) {
   const { data: fundingRecords, isLoading } = useFundingRecords(state);
+  const [sortField, setSortField] = useState<SortField>("funding");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("desc");
+    }
+  };
+
+  const sortedRecords = useMemo(() => {
+    if (!fundingRecords) return [];
+    
+    const sorted = [...fundingRecords].sort((a, b) => {
+      let aVal: any;
+      let bVal: any;
+
+      switch (sortField) {
+        case "organization":
+          aVal = a.organizations.name.toLowerCase();
+          bVal = b.organizations.name.toLowerCase();
+          break;
+        case "vertical":
+          aVal = a.verticals.name.toLowerCase();
+          bVal = b.verticals.name.toLowerCase();
+          break;
+        case "funding":
+          aVal = Number(a.amount);
+          bVal = Number(b.amount);
+          break;
+        case "status":
+          aVal = a.status.toLowerCase();
+          bVal = b.status.toLowerCase();
+          break;
+        case "lastUpdated":
+          aVal = a.organizations.last_updated || "";
+          bVal = b.organizations.last_updated || "";
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [fundingRecords, sortField, sortOrder]);
+
+  const exportToCSV = () => {
+    if (!sortedRecords.length) return;
+
+    const headers = ["Organization", "Vertical", "Funding", "Status", "Last Updated"];
+    const rows = sortedRecords.map(record => [
+      record.organizations.name,
+      record.verticals.name,
+      Number(record.amount),
+      record.status,
+      record.organizations.last_updated || "N/A",
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `funding-records-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const exportToExcel = () => {
+    if (!sortedRecords.length) return;
+
+    const data = sortedRecords.map(record => ({
+      Organization: record.organizations.name,
+      Vertical: record.verticals.name,
+      Funding: Number(record.amount),
+      Status: record.status,
+      "Last Updated": record.organizations.last_updated || "N/A",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Funding Records");
+    XLSX.writeFile(wb, `funding-records-${new Date().toISOString().split("T")[0]}.xlsx`);
+  };
 
   if (isLoading) {
     return (
@@ -40,28 +141,90 @@ export function FundingTable({ state }: FundingTableProps) {
 
   return (
     <Card className="p-6">
-      <div className="mb-6">
-        <h3 className="text-xl font-bold text-foreground">
-          Organizations Receiving Funding
-        </h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Key government agencies and departments with active funding
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h3 className="text-xl font-bold text-foreground">
+            Organizations Receiving Funding
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Key government agencies and departments with active funding
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={exportToCSV} variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            CSV
+          </Button>
+          <Button onClick={exportToExcel} variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Excel
+          </Button>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Organization</TableHead>
-              <TableHead>Vertical</TableHead>
-              <TableHead>Funding</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Updated</TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSort("organization")}
+                  className="flex items-center gap-1 hover:bg-transparent"
+                >
+                  Organization
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSort("vertical")}
+                  className="flex items-center gap-1 hover:bg-transparent"
+                >
+                  Vertical
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSort("funding")}
+                  className="flex items-center gap-1 hover:bg-transparent"
+                >
+                  Funding
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSort("status")}
+                  className="flex items-center gap-1 hover:bg-transparent"
+                >
+                  Status
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSort("lastUpdated")}
+                  className="flex items-center gap-1 hover:bg-transparent"
+                >
+                  Last Updated
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {fundingRecords && fundingRecords.length > 0 ? (
-              fundingRecords.map((record) => (
+            {sortedRecords && sortedRecords.length > 0 ? (
+              sortedRecords.map((record) => (
                 <TableRow key={record.id}>
                   <TableCell className="font-medium">
                     {record.organizations.name}

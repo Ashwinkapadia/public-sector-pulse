@@ -79,7 +79,7 @@ serve(async (req) => {
             "End Date",
             "Description",
           ],
-          limit: 100,
+          limit: 500,
           page: 1,
           order: "desc",
           sort: "Award Amount",
@@ -94,7 +94,63 @@ serve(async (req) => {
     }
 
     const searchData = await searchResponse.json();
-    console.log(`Found ${searchData.results?.length || 0} results`);
+    console.log(`Found ${searchData.results?.length || 0} results from page 1`);
+
+    // Fetch additional pages if available
+    let allResults = searchData.results || [];
+    const totalPages = Math.min(Math.ceil((searchData.page_metadata?.total || 0) / 500), 5); // Limit to 5 pages (2500 records max)
+
+    for (let page = 2; page <= totalPages; page++) {
+      const pageResponse = await fetch(
+        "https://api.usaspending.gov/api/v2/search/spending_by_award/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            filters: {
+              recipient_locations: [
+                {
+                  country: "USA",
+                  state: state,
+                },
+              ],
+              time_period: [
+                {
+                  start_date: startDate || `${fiscalYear}-01-01`,
+                  end_date: endDate || `${fiscalYear}-12-31`,
+                },
+              ],
+              award_type_codes: ["02", "03", "04", "05"],
+            },
+            fields: [
+              "Award ID",
+              "Recipient Name",
+              "Award Amount",
+              "Award Type",
+              "Awarding Agency",
+              "Awarding Sub Agency",
+              "Start Date",
+              "End Date",
+              "Description",
+            ],
+            limit: 500,
+            page: page,
+            order: "desc",
+            sort: "Award Amount",
+          }),
+        }
+      );
+
+      if (pageResponse.ok) {
+        const pageData = await pageResponse.json();
+        allResults = allResults.concat(pageData.results || []);
+        console.log(`Found ${pageData.results?.length || 0} results from page ${page}`);
+      }
+    }
+
+    console.log(`Total results fetched: ${allResults.length}`);
 
     // Get existing verticals
     const { data: existingVerticals } = await supabaseClient
@@ -109,7 +165,7 @@ serve(async (req) => {
     const processedOrgs = new Set<string>();
 
     // Process each result
-    for (const result of searchData.results || []) {
+    for (const result of allResults) {
       try {
         const recipientName = result["Recipient Name"];
         const awardAmount = parseFloat(result["Award Amount"]) || 0;
