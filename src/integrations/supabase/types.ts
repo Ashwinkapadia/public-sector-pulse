@@ -17,6 +17,7 @@ export type Database = {
       funding_records: {
         Row: {
           amount: number
+          cfda_code: string | null
           created_at: string
           date_range_end: string | null
           date_range_start: string | null
@@ -32,6 +33,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cfda_code?: string | null
           created_at?: string
           date_range_end?: string | null
           date_range_start?: string | null
@@ -47,6 +49,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cfda_code?: string | null
           created_at?: string
           date_range_end?: string | null
           date_range_start?: string | null
@@ -86,23 +89,29 @@ export type Database = {
       }
       grant_types: {
         Row: {
+          cfda_code: string | null
           created_at: string
           description: string | null
           federal_agency: string | null
+          grant_type: string | null
           id: string
           name: string
         }
         Insert: {
+          cfda_code?: string | null
           created_at?: string
           description?: string | null
           federal_agency?: string | null
+          grant_type?: string | null
           id?: string
           name: string
         }
         Update: {
+          cfda_code?: string | null
           created_at?: string
           description?: string | null
           federal_agency?: string | null
+          grant_type?: string | null
           id?: string
           name?: string
         }
