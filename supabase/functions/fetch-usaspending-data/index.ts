@@ -112,8 +112,8 @@ serve(async (req) => {
     let allResults = searchData.results || [];
     const totalPages = Math.min(
       Math.ceil((searchData.page_metadata?.total || 0) / 100),
-      5
-    ); // Limit to 5 pages (max 500 records)
+      3
+    ); // Limit to 3 pages (max 300 records) to avoid timeouts
 
     for (let page = 2; page <= totalPages; page++) {
       const pageResponse = await fetch(
@@ -194,6 +194,17 @@ serve(async (req) => {
 
     let recordsAdded = 0;
     const processedOrgs = new Set<string>();
+    const existingRecords = new Set<string>();
+
+    // Get existing funding records to prevent duplicates
+    const { data: existingFundingRecords } = await supabaseClient
+      .from("funding_records")
+      .select("organization_id, amount, fiscal_year, source")
+      .eq("source", "USAspending.gov");
+    
+    existingFundingRecords?.forEach(record => {
+      existingRecords.add(`${record.organization_id}-${record.amount}-${record.fiscal_year}`);
+    });
 
     // Process each result
     for (const result of allResults) {
@@ -215,35 +226,75 @@ serve(async (req) => {
           grantTypeId = grantTypeNameMap.get(cfdaTitle.toLowerCase()) || null;
         }
 
-        // Determine vertical based on agency name
-        let verticalName = "Other";
-        const agencyLower = awardingAgency.toLowerCase();
+        // Determine vertical using intelligent mapping
+        const description = result["Description"] || "";
+        const subAgency = result["Awarding Sub Agency"] || "";
+        const combinedText = `${cfdaTitle} ${description} ${awardingAgency} ${subAgency} ${recipientName}`.toLowerCase();
         
+        let verticalName = "Other";
+        
+        // Workforce Development
         if (
-          agencyLower.includes("labor") ||
-          agencyLower.includes("employment") ||
-          agencyLower.includes("workforce")
+          combinedText.match(/\b(workforce|employment|job training|career|apprentice|labor|occupational|vocational training|wioa)\b/)
         ) {
           verticalName = "Workforce Development";
-        } else if (agencyLower.includes("aging") || agencyLower.includes("elder")) {
+        }
+        // Aging Services
+        else if (
+          combinedText.match(/\b(aging|elderly|senior|older adult|elder care|geriatric|nutrition for the elderly|meals on wheels)\b/)
+        ) {
           verticalName = "Aging Services";
-        } else if (agencyLower.includes("veteran")) {
+        }
+        // Veterans
+        else if (
+          combinedText.match(/\b(veteran|veterans|va medical|military service|veteran affairs)\b/)
+        ) {
           verticalName = "Veterans";
-        } else if (
-          agencyLower.includes("violence") ||
-          agencyLower.includes("justice") ||
-          agencyLower.includes("crime")
+        }
+        // CVI Prevention (Community Violence Intervention)
+        else if (
+          combinedText.match(/\b(violence intervention|violence prevention|community violence|crime prevention|juvenile justice|gang|victim)\b/)
         ) {
           verticalName = "CVI Prevention";
-        } else if (agencyLower.includes("health") || agencyLower.includes("hhs")) {
+        }
+        // Home Visiting
+        else if (
+          combinedText.match(/\b(home visiting|maternal health|child health|early childhood|home visitation|maternal infant|prenatal|postpartum|family support|healthy start)\b/)
+        ) {
           verticalName = "Home Visiting";
-        } else if (
-          agencyLower.includes("correction") ||
-          agencyLower.includes("prison") ||
-          agencyLower.includes("reentry")
+        }
+        // Re-entry
+        else if (
+          combinedText.match(/\b(reentry|re-entry|prisoner reintegration|correctional|prison|incarceration|offender|recidivism|post-release|second chance)\b/)
         ) {
           verticalName = "Re-entry";
         }
+        // Energy & Environment (catch more grants)
+        else if (
+          combinedText.match(/\b(energy|renewable|solar|wind|climate|environment|conservation|emission|carbon|battery|electric|hydrogen|green|sustainable|recycl)\b/)
+        ) {
+          verticalName = "Energy & Environment";
+        }
+        // Transportation & Infrastructure
+        else if (
+          combinedText.match(/\b(transportation|transit|highway|airport|port|infrastructure|rail|bridge|road|traffic)\b/)
+        ) {
+          verticalName = "Transportation & Infrastructure";
+        }
+        // Education
+        else if (
+          combinedText.match(/\b(education|school|student|academic|university|college|learning|literacy|teach)\b/)
+        ) {
+          verticalName = "Education";
+        }
+        // Healthcare
+        else if (
+          combinedText.match(/\b(health|medical|hospital|clinic|disease|mental health|substance abuse|treatment|patient|care)\b/)
+        ) {
+          verticalName = "Healthcare";
+        }
+        
+        console.log(`Mapping "${recipientName}" to vertical: ${verticalName}`);
 
         const verticalId = verticalMap.get(verticalName.toLowerCase());
 
@@ -297,6 +348,13 @@ serve(async (req) => {
           processedOrgs.add(recipientName);
         }
 
+        // Check for duplicate funding record
+        const recordKey = `${organizationId}-${awardAmount}-${fiscalYear}`;
+        if (existingRecords.has(recordKey)) {
+          console.log(`Skipping duplicate record for ${recipientName}`);
+          continue;
+        }
+
         // Insert funding record
         const { data: fundingRecord, error: fundingError } = await supabaseClient
           .from("funding_records")
@@ -311,6 +369,7 @@ serve(async (req) => {
             cfda_code: cfdaNumber || null,
             grant_type_id: grantTypeId,
             notes: `From USAspending.gov - ${awardingAgency}`,
+            source: "USAspending.gov",
           })
           .select()
           .single();
@@ -319,6 +378,7 @@ serve(async (req) => {
           console.error("Error inserting funding record:", fundingError);
         } else {
           recordsAdded++;
+          existingRecords.add(recordKey);
 
           // Create sample subawards (20-30% of funding amount distributed)
           if (fundingRecord && awardAmount > 50000) {
