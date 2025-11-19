@@ -8,58 +8,35 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { useFundingRecords } from "@/hooks/useFundingData";
 
 interface FundingTableProps {
   state?: string;
 }
 
 export function FundingTable({ state }: FundingTableProps) {
-  // Mock data - will be replaced with real data
-  const organizations = [
-    {
-      name: "California Employment Development Department",
-      vertical: "Workforce Development",
-      funding: "$26.36B",
-      status: "Active",
-      lastUpdated: "2025-03-15",
-    },
-    {
-      name: "New York State Office for the Aging",
-      vertical: "Aging Services",
-      funding: "$406M",
-      status: "Active",
-      lastUpdated: "2025-02-28",
-    },
-    {
-      name: "Texas Workforce Commission",
-      vertical: "Workforce Development",
-      funding: "$3.06B",
-      status: "Active",
-      lastUpdated: "2025-03-01",
-    },
-    {
-      name: "Illinois Department on Aging",
-      vertical: "Aging Services",
-      funding: "$616M",
-      status: "Active",
-      lastUpdated: "2025-01-20",
-    },
-    {
-      name: "California Violence Intervention Program",
-      vertical: "CVI Prevention",
-      funding: "$58M",
-      status: "Active",
-      lastUpdated: "2025-03-10",
-    },
-  ];
+  const { data: fundingRecords, isLoading } = useFundingRecords(state);
 
-  // Filter by state if selected
-  const filteredOrgs = state
-    ? organizations.filter((org) =>
-        org.name.toLowerCase().includes(state.toLowerCase()) ||
-        org.name.includes(state)
-      )
-    : organizations;
+  if (isLoading) {
+    return (
+      <Card className="p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-1/3" />
+          <div className="h-64 bg-muted rounded" />
+        </div>
+      </Card>
+    );
+  }
+
+  const formatCurrency = (value: number) => {
+    if (value >= 1_000_000_000) {
+      return `$${(value / 1_000_000_000).toFixed(2)}B`;
+    }
+    if (value >= 1_000_000) {
+      return `$${(value / 1_000_000).toFixed(0)}M`;
+    }
+    return `$${value.toLocaleString()}`;
+  };
 
   return (
     <Card className="p-6">
@@ -83,23 +60,35 @@ export function FundingTable({ state }: FundingTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredOrgs.map((org, index) => (
-              <TableRow key={index}>
-                <TableCell className="font-medium">{org.name}</TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{org.vertical}</Badge>
-                </TableCell>
-                <TableCell className="font-semibold">{org.funding}</TableCell>
-                <TableCell>
-                  <Badge className="bg-accent text-accent-foreground">
-                    {org.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {org.lastUpdated}
+            {fundingRecords && fundingRecords.length > 0 ? (
+              fundingRecords.map((record) => (
+                <TableRow key={record.id}>
+                  <TableCell className="font-medium">
+                    {record.organizations.name}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{record.verticals.name}</Badge>
+                  </TableCell>
+                  <TableCell className="font-semibold">
+                    {formatCurrency(Number(record.amount))}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className="bg-accent text-accent-foreground">
+                      {record.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {record.organizations.last_updated || "N/A"}
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  No funding records found. Add data to get started.
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </div>
