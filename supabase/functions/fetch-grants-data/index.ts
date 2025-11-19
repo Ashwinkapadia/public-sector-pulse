@@ -57,9 +57,15 @@ serve(async (req) => {
 
     console.log("Fetching from Grants.gov:", grantsUrl.toString());
 
+    const apiKey = Deno.env.get("GRANTS_GOV_API_KEY");
+    if (!apiKey) {
+      throw new Error("GRANTS_GOV_API_KEY is not configured");
+    }
+
     const grantsResponse = await fetch(grantsUrl.toString(), {
       headers: {
         "Accept": "application/json",
+        "X-Api-Key": apiKey,
       },
     });
 
