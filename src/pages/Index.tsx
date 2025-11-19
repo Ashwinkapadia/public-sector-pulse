@@ -26,6 +26,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [fetchingNASBO, setFetchingNASBO] = useState(false);
+  const [fetchingGrants, setFetchingGrants] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const navigate = useNavigate();
@@ -147,6 +148,48 @@ const Index = () => {
       });
     } finally {
       setFetchingNASBO(false);
+    }
+  };
+
+  const handleFetchGrantsData = async () => {
+    if (!selectedState) {
+      toast({
+        variant: "destructive",
+        title: "State Required",
+        description: "Please select a state before fetching data",
+      });
+      return;
+    }
+
+    setFetchingGrants(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("fetch-grants-data", {
+        body: {
+          state: selectedState,
+          startDate: startDate?.toISOString().split("T")[0],
+          endDate: endDate?.toISOString().split("T")[0],
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success!",
+        description: `Fetched ${data?.recordsAdded || 0} grant opportunities from Grants.gov`,
+      });
+
+      // Refresh the page data
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Error fetching Grants.gov data:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to fetch Grants.gov data",
+        description: error.message || "An error occurred while fetching Grants.gov data",
+      });
+    } finally {
+      setFetchingGrants(false);
     }
   };
 
@@ -402,7 +445,7 @@ const Index = () => {
                 onSelectGrantType={setSelectedGrantType}
               />
             </div>
-            <div className="mt-6 flex gap-3 justify-end">
+            <div className="mt-6 flex gap-3 justify-end flex-wrap">
               <Button
                 onClick={handleFetchUSASpendingData}
                 disabled={fetching || !selectedState}
@@ -413,11 +456,21 @@ const Index = () => {
                 {fetching ? "Fetching..." : "Fetch USAspending.gov"}
               </Button>
               <Button
+                onClick={handleFetchGrantsData}
+                disabled={fetchingGrants || !selectedState}
+                className="gap-2"
+                size="lg"
+                variant="secondary"
+              >
+                <RefreshCw className={`h-4 w-4 ${fetchingGrants ? "animate-spin" : ""}`} />
+                {fetchingGrants ? "Fetching..." : "Fetch Grants.gov"}
+              </Button>
+              <Button
                 onClick={handleFetchNASBOData}
                 disabled={fetchingNASBO || !selectedState}
                 className="gap-2"
                 size="lg"
-                variant="secondary"
+                variant="outline"
               >
                 <RefreshCw className={`h-4 w-4 ${fetchingNASBO ? "animate-spin" : ""}`} />
                 {fetchingNASBO ? "Fetching..." : "Fetch NASBO Data"}
