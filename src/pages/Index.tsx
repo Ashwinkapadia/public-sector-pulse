@@ -20,8 +20,9 @@ import { VerticalsFilter } from "@/components/VerticalsFilter";
 
 const Index = () => {
   const [selectedState, setSelectedState] = useState<string>();
-  const [startDate, setStartDate] = useState<Date>();
-  const [endDate, setEndDate] = useState<Date>();
+  // Set default date range to show last 10 years of data
+  const [startDate, setStartDate] = useState<Date>(new Date(new Date().getFullYear() - 10, 0, 1));
+  const [endDate, setEndDate] = useState<Date>(new Date());
   const [selectedVerticals, setSelectedVerticals] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
