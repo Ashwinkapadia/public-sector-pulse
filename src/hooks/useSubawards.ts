@@ -48,9 +48,9 @@ export function useSubawards(fundingRecordId?: string) {
   });
 }
 
-export function useSubawardsByState(state?: string) {
+export function useSubawardsByState(state?: string, startDate?: Date, endDate?: Date) {
   return useQuery({
-    queryKey: ["subawards-by-state", state],
+    queryKey: ["subawards-by-state", state, startDate, endDate],
     queryFn: async () => {
       let query = supabase
         .from("subawards")
@@ -66,7 +66,8 @@ export function useSubawardsByState(state?: string) {
             id,
             organization_id,
             source,
-            fiscal_year
+            fiscal_year,
+            action_date
           )
         `)
         .order("amount", { ascending: false });
@@ -78,7 +79,24 @@ export function useSubawardsByState(state?: string) {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as Subaward[];
+      
+      // Filter by action_date of parent funding_record on the client side
+      let filteredData = data as Subaward[];
+      
+      if (startDate || endDate) {
+        filteredData = filteredData.filter((subaward: any) => {
+          const actionDate = subaward.funding_record?.action_date;
+          if (!actionDate) return false;
+          
+          const date = new Date(actionDate);
+          if (startDate && date < startDate) return false;
+          if (endDate && date > endDate) return false;
+          
+          return true;
+        });
+      }
+      
+      return filteredData;
     },
   });
 }
