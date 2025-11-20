@@ -123,23 +123,22 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
   });
 }
 
-export function useFundingMetrics(state?: string) {
+export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Date) {
   return useQuery({
-    queryKey: ["funding_metrics", state],
+    queryKey: ["funding_metrics", state, startDate, endDate],
     queryFn: async () => {
-      let orgQuery = supabase.from("organizations").select("id", { count: "exact", head: true });
-
+      // First get organization IDs for the selected state
+      let orgIds: string[] | undefined;
       if (state) {
-        orgQuery = orgQuery.eq("state", state);
-      }
-
-      const { count: orgCount, data: orgs } = await orgQuery;
-      
-      // Get funding data for these organizations
-      let fundingQuery = supabase.from("funding_records").select("amount");
-      
-      if (state && orgs) {
-        const orgIds = orgs.map(org => org.id);
+        const { data: orgs, error: orgError } = await supabase
+          .from("organizations")
+          .select("id")
+          .eq("state", state);
+        
+        if (orgError) throw orgError;
+        orgIds = orgs.map(org => org.id);
+        
+        // If no organizations found for this state, return empty array
         if (orgIds.length === 0) {
           return {
             totalOrganizations: 0,
@@ -148,19 +147,38 @@ export function useFundingMetrics(state?: string) {
             activePrograms: 0,
           };
         }
+      }
+      
+      // Get funding data with date filters
+      let fundingQuery = supabase.from("funding_records").select("organization_id, amount");
+      
+      if (orgIds) {
         fundingQuery = fundingQuery.in("organization_id", orgIds);
+      }
+
+      // Filter by action_date (when grant was awarded)
+      if (startDate) {
+        fundingQuery = fundingQuery.gte("action_date", startDate.toISOString().split("T")[0]);
+      }
+
+      if (endDate) {
+        fundingQuery = fundingQuery.lte("action_date", endDate.toISOString().split("T")[0]);
       }
 
       const { data: fundingData } = await fundingQuery;
 
+      // Count unique organizations that have funding records in the date range
+      const uniqueOrgIds = new Set(fundingData?.map(record => record.organization_id) || []);
+      const orgCount = uniqueOrgIds.size;
+
       const totalFunding = fundingData?.reduce((sum, record) => sum + Number(record.amount), 0) || 0;
-      const avgFunding = orgCount && orgCount > 0 ? totalFunding / orgCount : 0;
+      const avgFunding = orgCount > 0 ? totalFunding / orgCount : 0;
 
       return {
-        totalOrganizations: orgCount || 0,
+        totalOrganizations: orgCount,
         totalFunding,
         avgFunding,
-        activePrograms: orgCount || 0,
+        activePrograms: orgCount,
       };
     },
   });

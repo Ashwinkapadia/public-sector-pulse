@@ -28,10 +28,12 @@ function MetricCard({ title, value, description, icon }: MetricCardProps) {
 
 interface FundingMetricsProps {
   state?: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
-export function FundingMetrics({ state }: FundingMetricsProps) {
-  const { data: metrics, isLoading } = useFundingMetrics(state);
+export function FundingMetrics({ state, startDate, endDate }: FundingMetricsProps) {
+  const { data: metrics, isLoading } = useFundingMetrics(state, startDate, endDate);
 
   if (isLoading) {
     return (
