@@ -16,13 +16,15 @@ import * as XLSX from "xlsx";
 
 interface SubawardsTableProps {
   state?: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
 type SortField = "organization" | "location" | "amount" | "awardDate";
 type SortOrder = "asc" | "desc";
 
-export function SubawardsTable({ state }: SubawardsTableProps) {
-  const { data: subawards, isLoading } = useSubawardsByState(state);
+export function SubawardsTable({ state, startDate, endDate }: SubawardsTableProps) {
+  const { data: subawards, isLoading } = useSubawardsByState(state, startDate, endDate);
   const [sortField, setSortField] = useState<SortField>("amount");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 

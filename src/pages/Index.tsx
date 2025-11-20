@@ -496,7 +496,7 @@ const Index = () => {
 
         {/* Subawards Table */}
         <section className="mb-8">
-          <SubawardsTable state={selectedState} />
+          <SubawardsTable state={selectedState} startDate={startDate} endDate={endDate} />
         </section>
 
         {/* Data Sources */}
