@@ -167,9 +167,19 @@ export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Da
 
       const { data: fundingData } = await fundingQuery;
 
+      console.log('Funding Metrics Debug:', {
+        state,
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString(),
+        orgIdsCount: orgIds?.length,
+        fundingRecordsCount: fundingData?.length
+      });
+
       // Count unique organizations that have funding records in the date range
       const uniqueOrgIds = new Set(fundingData?.map(record => record.organization_id) || []);
       const orgCount = uniqueOrgIds.size;
+
+      console.log('Unique org count:', orgCount);
 
       const totalFunding = fundingData?.reduce((sum, record) => sum + Number(record.amount), 0) || 0;
       const avgFunding = orgCount > 0 ? totalFunding / orgCount : 0;
