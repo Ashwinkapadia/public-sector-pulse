@@ -123,10 +123,13 @@ serve(async (req) => {
 
     // Fetch additional pages if available
     let allResults = searchData.results || [];
+    const totalResults = searchData.page_metadata?.total || 0;
     const totalPages = Math.min(
-      Math.ceil((searchData.page_metadata?.total || 0) / 100),
-      3
-    ); // Limit to 3 pages (max 300 records) to avoid timeouts
+      Math.ceil(totalResults / 100),
+      10
+    ); // Increased to 10 pages (max 1000 records) for better coverage
+    
+    console.log(`Total results available: ${totalResults}, fetching up to ${totalPages} pages`);
 
     for (let page = 2; page <= totalPages; page++) {
       const pageResponse = await fetch(
