@@ -49,6 +49,52 @@ serve(async (req) => {
 
     console.log(`Fetching data for state: ${state}`);
 
+    // Clear existing USAspending.gov data for this state before fetching new data
+    const { data: orgsToClear, error: orgsError } = await supabaseClient
+      .from("organizations")
+      .select("id")
+      .eq("state", state);
+
+    if (orgsError) {
+      console.error("Error fetching organizations to clear:", orgsError);
+    }
+
+    const orgIdsToClear = (orgsToClear || []).map((org) => org.id);
+
+    if (orgIdsToClear.length > 0) {
+      const { data: fundingToClear, error: fundingSelectError } = await supabaseClient
+        .from("funding_records")
+        .select("id")
+        .in("organization_id", orgIdsToClear)
+        .eq("source", "USAspending.gov");
+
+      if (fundingSelectError) {
+        console.error("Error fetching funding records to clear:", fundingSelectError);
+      } else {
+        const fundingIdsToClear = (fundingToClear || []).map((fr) => fr.id);
+
+        if (fundingIdsToClear.length > 0) {
+          const { error: subawardsDeleteError } = await supabaseClient
+            .from("subawards")
+            .delete()
+            .in("funding_record_id", fundingIdsToClear);
+
+          if (subawardsDeleteError) {
+            console.error("Error deleting existing subawards:", subawardsDeleteError);
+          }
+
+          const { error: fundingDeleteError } = await supabaseClient
+            .from("funding_records")
+            .delete()
+            .in("id", fundingIdsToClear);
+
+          if (fundingDeleteError) {
+            console.error("Error deleting existing funding records:", fundingDeleteError);
+          }
+        }
+      }
+    }
+
     // Get current fiscal year
     const currentYear = new Date().getFullYear();
     const fiscalYear = startDate
@@ -389,86 +435,9 @@ serve(async (req) => {
           recordsAdded++;
           existingRecords.add(recordKey);
 
-          // Fetch real subaward data from USASpending.gov
-          if (fundingRecord && result.internal_id) {
-            try {
-              console.log(`Fetching subawards for award ${result.internal_id}...`);
-              
-              const subawardsResponse = await fetch("https://api.usaspending.gov/api/v2/subawards/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  award_id: result.internal_id,
-                  limit: 10, // Limit to top 10 subawards per award
-                  page: 1,
-                }),
-              });
+          // Subaward fetching disabled to improve performance and reliability.
+          // TODO: Implement a separate, on-demand subaward fetch if detailed subaward data is needed.
 
-              if (subawardsResponse.ok) {
-                const subawardsData = await subawardsResponse.json();
-                const subawards = subawardsData.results || [];
-                
-                console.log(`Found ${subawards.length} real subawards for ${recipientName}`);
-                let subawardsAdded = 0;
-
-                for (const subaward of subawards) {
-                  try {
-                    const subRecipientName = subaward.recipient_name || subaward.sub_awardee_or_recipient_legal || "Unknown Recipient";
-                    const subAmount = parseFloat(subaward.amount) || 0;
-                    const subAwardDate = subaward.action_date || subaward.sub_action_date || startDateStr;
-                    const subState = subaward.recipient_location_state_code || state;
-
-                    if (subAmount > 0 && subRecipientName && subRecipientName !== "Unknown Recipient") {
-                      // Create or get subaward recipient organization
-                      const { data: subOrg, error: subOrgError } = await supabaseClient
-                        .from("organizations")
-                        .upsert({
-                          name: subRecipientName,
-                          state: subState,
-                          city: subaward.recipient_location_city_name || null,
-                          last_updated: new Date().toISOString().split("T")[0],
-                        }, { onConflict: "name,state" })
-                        .select()
-                        .single();
-
-                      if (subOrgError) {
-                        console.error(`Error creating subaward organization: ${subOrgError.message}`);
-                        continue;
-                      }
-
-                      if (subOrg) {
-                        const { error: subawardError } = await supabaseClient
-                          .from("subawards")
-                          .insert({
-                            funding_record_id: fundingRecord.id,
-                            recipient_organization_id: subOrg.id,
-                            amount: subAmount,
-                            award_date: subAwardDate,
-                            description: subaward.description || `${cfdaTitle || verticalName} program subaward`,
-                          });
-
-                        if (subawardError) {
-                          console.error(`Error creating subaward: ${subawardError.message}`);
-                        } else {
-                          subawardsAdded++;
-                        }
-                      }
-                    }
-                  } catch (subError) {
-                    console.error("Error processing subaward:", subError);
-                  }
-                }
-
-                if (subawardsAdded > 0) {
-                  console.log(`Successfully added ${subawardsAdded} real subawards for ${recipientName}`);
-                }
-              } else {
-                console.log(`No subaward data available for award ${result.internal_id}`);
-              }
-            } catch (error) {
-              console.error("Error fetching subawards:", error);
-            }
-          }
         }
       } catch (error) {
         console.error("Error processing result:", error);
