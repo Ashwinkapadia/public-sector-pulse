@@ -491,7 +491,7 @@ const Index = () => {
 
         {/* Organizations Table */}
         <section className="mb-8">
-          <FundingTable state={selectedState} verticalIds={selectedVerticals} />
+          <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} />
         </section>
 
         {/* Subawards Table */}
