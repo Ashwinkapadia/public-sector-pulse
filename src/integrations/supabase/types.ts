@@ -24,6 +24,7 @@ export type Database = {
           fiscal_year: number
           grant_type_id: string | null
           id: string
+          last_updated: string | null
           notes: string | null
           organization_id: string
           source: string
@@ -40,6 +41,7 @@ export type Database = {
           fiscal_year: number
           grant_type_id?: string | null
           id?: string
+          last_updated?: string | null
           notes?: string | null
           organization_id: string
           source?: string
@@ -56,6 +58,7 @@ export type Database = {
           fiscal_year?: number
           grant_type_id?: string | null
           id?: string
+          last_updated?: string | null
           notes?: string | null
           organization_id?: string
           source?: string

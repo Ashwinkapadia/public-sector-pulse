@@ -355,7 +355,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Insert funding record
+        // Insert funding record with last_updated timestamp
         const { data: fundingRecord, error: fundingError } = await supabaseClient
           .from("funding_records")
           .insert({
@@ -370,6 +370,7 @@ serve(async (req) => {
             grant_type_id: grantTypeId,
             notes: `From USAspending.gov - ${awardingAgency}`,
             source: "USAspending.gov",
+            last_updated: new Date().toISOString(),
           })
           .select()
           .single();
@@ -380,49 +381,84 @@ serve(async (req) => {
           recordsAdded++;
           existingRecords.add(recordKey);
 
-          // Create sample subawards (20-30% of funding amount distributed)
-          if (fundingRecord && awardAmount > 50000) {
-            const numSubawards = Math.floor(Math.random() * 3) + 1; // 1-3 subawards
-            const subawardAmount = (awardAmount * 0.25) / numSubawards;
-            console.log(`Creating ${numSubawards} subawards for ${recipientName} (${formatAmount(awardAmount)})`);
+          // Fetch real subaward data from USASpending.gov
+          if (fundingRecord && result.internal_id) {
+            try {
+              console.log(`Fetching subawards for award ${result.internal_id}...`);
+              
+              const subawardsResponse = await fetch("https://api.usaspending.gov/api/v2/subawards/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  award_id: result.internal_id,
+                  limit: 10, // Limit to top 10 subawards per award
+                  page: 1,
+                }),
+              });
 
-            for (let i = 0; i < numSubawards; i++) {
-              try {
-                // Create or get subaward recipient organization
-                const subawardOrgName = `${recipientName} - Subrecipient ${i + 1}`;
-                const { data: subOrg, error: subOrgError } = await supabaseClient
-                  .from("organizations")
-                  .upsert({
-                    name: subawardOrgName,
-                    state: state,
-                    last_updated: new Date().toISOString().split("T")[0],
-                  }, { onConflict: "name,state" })
-                  .select()
-                  .single();
+              if (subawardsResponse.ok) {
+                const subawardsData = await subawardsResponse.json();
+                const subawards = subawardsData.results || [];
+                
+                console.log(`Found ${subawards.length} real subawards for ${recipientName}`);
+                let subawardsAdded = 0;
 
-                if (subOrgError) {
-                  console.error(`Error creating subaward organization: ${subOrgError.message}`);
-                  continue;
-                }
+                for (const subaward of subawards) {
+                  try {
+                    const subRecipientName = subaward.recipient_name || subaward.sub_awardee_or_recipient_legal || "Unknown Recipient";
+                    const subAmount = parseFloat(subaward.amount) || 0;
+                    const subAwardDate = subaward.action_date || subaward.sub_action_date || startDateStr;
+                    const subState = subaward.recipient_location_state_code || state;
 
-                if (subOrg) {
-                  const { error: subawardError } = await supabaseClient
-                    .from("subawards")
-                    .insert({
-                      funding_record_id: fundingRecord.id,
-                      recipient_organization_id: subOrg.id,
-                      amount: subawardAmount,
-                      award_date: startDateStr || new Date().toISOString().split("T")[0],
-                      description: `Subaward for ${cfdaTitle || verticalName} program`,
-                    });
+                    if (subAmount > 0 && subRecipientName && subRecipientName !== "Unknown Recipient") {
+                      // Create or get subaward recipient organization
+                      const { data: subOrg, error: subOrgError } = await supabaseClient
+                        .from("organizations")
+                        .upsert({
+                          name: subRecipientName,
+                          state: subState,
+                          city: subaward.recipient_location_city_name || null,
+                          last_updated: new Date().toISOString().split("T")[0],
+                        }, { onConflict: "name,state" })
+                        .select()
+                        .single();
 
-                  if (subawardError) {
-                    console.error(`Error creating subaward: ${subawardError.message}`);
+                      if (subOrgError) {
+                        console.error(`Error creating subaward organization: ${subOrgError.message}`);
+                        continue;
+                      }
+
+                      if (subOrg) {
+                        const { error: subawardError } = await supabaseClient
+                          .from("subawards")
+                          .insert({
+                            funding_record_id: fundingRecord.id,
+                            recipient_organization_id: subOrg.id,
+                            amount: subAmount,
+                            award_date: subAwardDate,
+                            description: subaward.description || `${cfdaTitle || verticalName} program subaward`,
+                          });
+
+                        if (subawardError) {
+                          console.error(`Error creating subaward: ${subawardError.message}`);
+                        } else {
+                          subawardsAdded++;
+                        }
+                      }
+                    }
+                  } catch (subError) {
+                    console.error("Error processing subaward:", subError);
                   }
                 }
-              } catch (error) {
-                console.error("Error in subaward creation:", error);
+
+                if (subawardsAdded > 0) {
+                  console.log(`Successfully added ${subawardsAdded} real subawards for ${recipientName}`);
+                }
+              } else {
+                console.log(`No subaward data available for award ${result.internal_id}`);
               }
+            } catch (error) {
+              console.error("Error fetching subawards:", error);
             }
           }
         }
