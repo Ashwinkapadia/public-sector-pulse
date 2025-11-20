@@ -20,13 +20,15 @@ import * as XLSX from "xlsx";
 interface FundingTableProps {
   state?: string;
   verticalIds?: string[];
+  startDate?: Date;
+  endDate?: Date;
 }
 
 type SortField = "organization" | "vertical" | "funding" | "status" | "lastUpdated";
 type SortOrder = "asc" | "desc";
 
-export function FundingTable({ state, verticalIds }: FundingTableProps) {
-  const { data: fundingRecords, isLoading } = useFundingRecords(state);
+export function FundingTable({ state, verticalIds, startDate, endDate }: FundingTableProps) {
+  const { data: fundingRecords, isLoading } = useFundingRecords(state, startDate, endDate);
   const { data: assignments } = useRepAssignments();
   const [sortField, setSortField] = useState<SortField>("funding");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
