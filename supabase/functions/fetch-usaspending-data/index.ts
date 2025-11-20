@@ -78,7 +78,7 @@ serve(async (req) => {
             ],
             award_type_codes: ["02", "03", "04", "05"],
           },
-          fields: [
+            fields: [
             "Award ID",
             "Recipient Name",
             "Award Amount",
@@ -87,6 +87,7 @@ serve(async (req) => {
             "Awarding Sub Agency",
             "Start Date",
             "End Date",
+            "Action Date",
             "Description",
             "CFDA Number",
             "CFDA Title",
@@ -148,6 +149,7 @@ serve(async (req) => {
               "Awarding Sub Agency",
               "Start Date",
               "End Date",
+              "Action Date",
               "Description",
               "CFDA Number",
               "CFDA Title",
@@ -214,6 +216,7 @@ serve(async (req) => {
         const awardingAgency = result["Awarding Agency"] || "Unknown";
         const startDateStr = result["Start Date"];
         const endDateStr = result["End Date"];
+        const actionDateStr = result["Action Date"] || startDateStr; // Use Action Date for when grant was awarded
         const cfdaNumber = result["CFDA Number"];
         const cfdaTitle = result["CFDA Title"];
 
@@ -355,7 +358,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Insert funding record with last_updated timestamp
+        // Insert funding record with last_updated timestamp and action_date
         const { data: fundingRecord, error: fundingError } = await supabaseClient
           .from("funding_records")
           .insert({
@@ -366,6 +369,7 @@ serve(async (req) => {
             fiscal_year: fiscalYear,
             date_range_start: startDateStr || null,
             date_range_end: endDateStr || null,
+            action_date: actionDateStr || null,
             cfda_code: cfdaNumber || null,
             grant_type_id: grantTypeId,
             notes: `From USAspending.gov - ${awardingAgency}`,

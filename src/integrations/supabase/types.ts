@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       funding_records: {
         Row: {
+          action_date: string | null
           amount: number
           cfda_code: string | null
           created_at: string
@@ -33,6 +34,7 @@ export type Database = {
           vertical_id: string
         }
         Insert: {
+          action_date?: string | null
           amount: number
           cfda_code?: string | null
           created_at?: string
@@ -50,6 +52,7 @@ export type Database = {
           vertical_id: string
         }
         Update: {
+          action_date?: string | null
           amount?: number
           cfda_code?: string | null
           created_at?: string
