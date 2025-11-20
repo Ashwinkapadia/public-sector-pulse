@@ -107,12 +107,13 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
         query = query.in("organization_id", orgIds);
       }
 
+      // Filter by action_date (when grant was awarded) instead of grant duration
       if (startDate) {
-        query = query.gte("date_range_start", startDate.toISOString().split("T")[0]);
+        query = query.gte("action_date", startDate.toISOString().split("T")[0]);
       }
 
       if (endDate) {
-        query = query.lte("date_range_end", endDate.toISOString().split("T")[0]);
+        query = query.lte("action_date", endDate.toISOString().split("T")[0]);
       }
 
       const { data, error } = await query;
