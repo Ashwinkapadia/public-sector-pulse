@@ -77,18 +77,6 @@ serve(async (req) => {
               },
             ],
             award_type_codes: ["02", "03", "04", "05"],
-            recipient_type_names: [
-              "authorities_and_commissions",
-              "local_government",
-              "regional_and_state_government",
-              "interstate_entity",
-              "indian_native_american_tribal_government",
-              "government",
-              "regional_organization",
-              "u.s._territory_or_possession",
-              "council_of_governments",
-              "national_government"
-            ],
           },
             fields: [
             "Award ID",
@@ -154,18 +142,6 @@ serve(async (req) => {
                 },
               ],
               award_type_codes: ["02", "03", "04", "05"],
-              recipient_type_names: [
-                "authorities_and_commissions",
-                "local_government",
-                "regional_and_state_government",
-                "interstate_entity",
-                "indian_native_american_tribal_government",
-                "government",
-                "regional_organization",
-                "u.s._territory_or_possession",
-                "council_of_governments",
-                "national_government"
-              ],
             },
             fields: [
               "Award ID",
