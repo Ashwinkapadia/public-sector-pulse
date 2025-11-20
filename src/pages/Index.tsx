@@ -481,7 +481,7 @@ const Index = () => {
 
         {/* Metrics Overview */}
         <section className="mb-8">
-          <FundingMetrics state={selectedState} />
+          <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} />
         </section>
 
         {/* Funding Chart */}
