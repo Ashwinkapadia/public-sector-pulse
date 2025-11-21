@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      fetch_progress: {
+        Row: {
+          created_at: string
+          current_page: number | null
+          errors: string[] | null
+          id: string
+          message: string | null
+          records_inserted: number | null
+          session_id: string
+          source: string
+          state: string
+          status: string
+          total_pages: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_page?: number | null
+          errors?: string[] | null
+          id?: string
+          message?: string | null
+          records_inserted?: number | null
+          session_id: string
+          source: string
+          state: string
+          status?: string
+          total_pages?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_page?: number | null
+          errors?: string[] | null
+          id?: string
+          message?: string | null
+          records_inserted?: number | null
+          session_id?: string
+          source?: string
+          state?: string
+          status?: string
+          total_pages?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       funding_records: {
         Row: {
           action_date: string | null
