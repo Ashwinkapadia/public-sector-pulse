@@ -22,6 +22,7 @@ interface RequestBody {
   state: string;
   startDate?: string;
   endDate?: string;
+  sessionId?: string;
 }
 
 serve(async (req) => {
@@ -35,7 +36,28 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { state, startDate, endDate } = await req.json() as RequestBody;
+    const { state, startDate, endDate, sessionId } = await req.json() as RequestBody & { sessionId?: string };
+    
+    // Create progress tracking session
+    const progressSessionId = sessionId || crypto.randomUUID();
+    
+    const { error: progressError } = await supabaseClient
+      .from("fetch_progress")
+      .upsert({
+        session_id: progressSessionId,
+        state,
+        source: "USAspending.gov",
+        status: "running",
+        message: "Starting fetch...",
+        total_pages: 0,
+        current_page: 0,
+        records_inserted: 0,
+        errors: [],
+      });
+
+    if (progressError) {
+      console.error("Error creating progress:", progressError);
+    }
 
     if (!state) {
       return new Response(
@@ -165,6 +187,16 @@ serve(async (req) => {
     ); // Increased to 10 pages (max 1000 records) for better coverage
     
     console.log(`Total results available: ${totalResults}, fetching up to ${totalPages} pages`);
+    
+    // Update progress with total pages
+    await supabaseClient
+      .from("fetch_progress")
+      .update({
+        total_pages: totalPages,
+        current_page: 1,
+        message: `Processing page 1 of ${totalPages}`,
+      })
+      .eq("session_id", progressSessionId);
 
     for (let page = 2; page <= totalPages; page++) {
       const pageResponse = await fetch(
@@ -218,10 +250,27 @@ serve(async (req) => {
         console.log(
           `Found ${pageData.results?.length || 0} results from page ${page}`,
         );
+        
+        // Update progress after each page
+        await supabaseClient
+          .from("fetch_progress")
+          .update({
+            current_page: page,
+            message: `Processing page ${page} of ${totalPages}`,
+          })
+          .eq("session_id", progressSessionId);
       }
     }
 
     console.log(`Total results fetched: ${allResults.length}`);
+    
+    // Update progress: starting to process records
+    await supabaseClient
+      .from("fetch_progress")
+      .update({
+        message: `Fetched ${allResults.length} results, processing records...`,
+      })
+      .eq("session_id", progressSessionId);
 
     // Get existing verticals
     const { data: existingVerticals } = await supabaseClient
@@ -247,6 +296,7 @@ serve(async (req) => {
     let recordsAdded = 0;
     const processedOrgs = new Set<string>();
     const existingRecords = new Set<string>();
+    const errors: string[] = [];
 
     // Get existing funding records to prevent duplicates
     const { data: existingFundingRecords } = await supabaseClient
@@ -434,6 +484,17 @@ serve(async (req) => {
         } else {
           recordsAdded++;
           existingRecords.add(recordKey);
+          
+          // Update progress every 10 records
+          if (recordsAdded % 10 === 0) {
+            await supabaseClient
+              .from("fetch_progress")
+              .update({
+                records_inserted: recordsAdded,
+                message: `Inserted ${recordsAdded} records...`,
+              })
+              .eq("session_id", progressSessionId);
+          }
 
           // Subaward fetching disabled to improve performance and reliability.
           // TODO: Implement a separate, on-demand subaward fetch if detailed subaward data is needed.
@@ -441,6 +502,19 @@ serve(async (req) => {
         }
       } catch (error) {
         console.error("Error processing result:", error);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        errors.push(errorMsg);
+        
+        // Update progress with error
+        if (errors.length <= 5) { // Only log first 5 errors to avoid bloat
+          await supabaseClient
+            .from("fetch_progress")
+            .update({
+              errors,
+              message: `Error processing record: ${errorMsg}`,
+            })
+            .eq("session_id", progressSessionId);
+        }
       }
     }
 
@@ -450,11 +524,23 @@ serve(async (req) => {
       .select("*", { count: "exact", head: true });
 
     console.log(`Successfully added ${recordsAdded} funding records and ${subawardCount || 0} subawards`);
+    
+    // Update final progress
+    await supabaseClient
+      .from("fetch_progress")
+      .update({
+        status: "completed",
+        records_inserted: recordsAdded,
+        errors,
+        message: `Completed! Inserted ${recordsAdded} records with ${errors.length} errors.`,
+      })
+      .eq("session_id", progressSessionId);
 
     return new Response(
       JSON.stringify({
         success: true,
         recordsAdded,
+        sessionId: progressSessionId,
         message: `Fetched and stored ${recordsAdded} funding records`,
       }),
       {
@@ -463,6 +549,29 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in fetch-usaspending-data function:", error);
+    
+    // Try to update progress with error status
+    try {
+      const { sessionId } = await req.json() as { sessionId?: string };
+      if (sessionId) {
+        const supabaseClient = createClient(
+          Deno.env.get("SUPABASE_URL") ?? "",
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+        );
+        
+        await supabaseClient
+          .from("fetch_progress")
+          .update({
+            status: "failed",
+            message: error instanceof Error ? error.message : "Unknown error",
+            errors: [error instanceof Error ? error.message : "Unknown error"],
+          })
+          .eq("session_id", sessionId);
+      }
+    } catch (updateError) {
+      console.error("Error updating progress:", updateError);
+    }
+    
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : "Unknown error",

@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { VerticalsFilter } from "@/components/VerticalsFilter";
+import { FetchProgress } from "@/components/FetchProgress";
 
 const Index = () => {
   const [selectedState, setSelectedState] = useState<string>();
@@ -29,6 +30,7 @@ const Index = () => {
   const [fetchingGrants, setFetchingGrants] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
+  const [fetchSessionId, setFetchSessionId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: savedSearches } = useSavedSearches();
@@ -78,6 +80,8 @@ const Index = () => {
     }
 
     setFetching(true);
+    const sessionId = crypto.randomUUID();
+    setFetchSessionId(sessionId);
     
     try {
       const { data, error } = await supabase.functions.invoke("fetch-usaspending-data", {
@@ -85,6 +89,7 @@ const Index = () => {
           state: selectedState,
           startDate: startDate?.toISOString().split("T")[0],
           endDate: endDate?.toISOString().split("T")[0],
+          sessionId,
         },
       });
 
@@ -94,9 +99,6 @@ const Index = () => {
         title: "Success!",
         description: `Fetched ${data?.recordsAdded || 0} funding records from USAspending.gov`,
       });
-
-      // Refresh the page data
-      window.location.reload();
     } catch (error: any) {
       console.error("Error fetching data:", error);
       toast({
@@ -104,9 +106,20 @@ const Index = () => {
         title: "Failed to fetch data",
         description: error.message || "An error occurred while fetching data",
       });
+      setFetchSessionId(null);
     } finally {
       setFetching(false);
     }
+  };
+
+  const handleFetchComplete = () => {
+    toast({
+      title: "Fetch Complete",
+      description: "Data has been successfully loaded. Refreshing...",
+    });
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
   };
 
   const handleFetchNASBOData = async () => {
@@ -478,6 +491,13 @@ const Index = () => {
             </div>
           </div>
         </section>
+
+        {/* Fetch Progress */}
+        {fetchSessionId && (
+          <section className="mb-8">
+            <FetchProgress sessionId={fetchSessionId} onComplete={handleFetchComplete} />
+          </section>
+        )}
 
         {/* Metrics Overview */}
         <section className="mb-8">
