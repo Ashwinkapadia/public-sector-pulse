@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { StateSelector } from "@/components/StateSelector";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ const Index = () => {
   const [searchName, setSearchName] = useState("");
   const [fetchSessionId, setFetchSessionId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: savedSearches } = useSavedSearches();
   const saveSearchMutation = useSaveSearch();
@@ -115,11 +117,12 @@ const Index = () => {
   const handleFetchComplete = () => {
     toast({
       title: "Fetch Complete",
-      description: "Data has been successfully loaded. Refreshing...",
+      description: "Data has been successfully loaded. Updating dashboard...",
     });
-    setTimeout(() => {
-      window.location.reload();
-    }, 2000);
+    queryClient.invalidateQueries({ queryKey: ["organizations"] });
+    queryClient.invalidateQueries({ queryKey: ["funding_records"] });
+    queryClient.invalidateQueries({ queryKey: ["funding_metrics"] });
+    queryClient.invalidateQueries({ queryKey: ["subawards-by-state"] });
   };
 
   const handleFetchNASBOData = async () => {
@@ -150,8 +153,10 @@ const Index = () => {
         description: `Fetched ${data?.recordsCreated || 0} NASBO budget records`,
       });
 
-      // Refresh the page data
-      window.location.reload();
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["funding_records"] });
+      queryClient.invalidateQueries({ queryKey: ["funding_metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["subawards-by-state"] });
     } catch (error: any) {
       console.error("Error fetching NASBO data:", error);
       toast({
@@ -192,8 +197,10 @@ const Index = () => {
         description: `Fetched ${data?.recordsAdded || 0} grant opportunities from Grants.gov`,
       });
 
-      // Refresh the page data
-      window.location.reload();
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["funding_records"] });
+      queryClient.invalidateQueries({ queryKey: ["funding_metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["subawards-by-state"] });
     } catch (error: any) {
       console.error("Error fetching Grants.gov data:", error);
       toast({
