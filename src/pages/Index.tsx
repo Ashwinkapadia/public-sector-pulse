@@ -250,12 +250,24 @@ const Index = () => {
 
       if (orgError) throw orgError;
 
+      // Reset local filters and state
+      setSelectedState(undefined);
+      setStartDate(undefined);
+      setEndDate(undefined);
+      setSelectedVerticals([]);
+      setFetchSessionId(null);
+
+      // Invalidate cached queries so the dashboard reflects cleared data
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["funding_records"] });
+      queryClient.invalidateQueries({ queryKey: ["funding_metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["subawards-by-state"] });
+
       toast({
         title: "Data cleared",
-        description: "All funding records, subawards, and organizations have been removed",
+        description:
+          "All funding records, subawards, and organizations have been removed from the dashboard",
       });
-
-      window.location.reload();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -264,7 +276,6 @@ const Index = () => {
       });
     }
   };
-
   const handleSaveSearch = async () => {
     if (!searchName.trim()) {
       toast({
