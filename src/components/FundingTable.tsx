@@ -163,10 +163,10 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h3 className="text-xl font-bold text-foreground">
-            Organizations Receiving Funding
+            Funding Records
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Key government agencies and departments with active funding
+            Each row represents a unique grant. Organizations may appear multiple times if they received multiple grants.
           </p>
         </div>
         <div className="flex gap-2">
