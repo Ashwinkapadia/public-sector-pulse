@@ -134,7 +134,7 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                Page {progress.current_page} of {progress.total_pages}
+                {progress.total_pages} total pages found • {progress.current_page} pages processed
               </span>
               <span className="text-muted-foreground">
                 {Math.round(progressPercent)}%

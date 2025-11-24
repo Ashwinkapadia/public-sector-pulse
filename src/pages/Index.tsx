@@ -115,14 +115,20 @@ const Index = () => {
   };
 
   const handleFetchComplete = () => {
-    toast({
-      title: "Fetch Complete",
-      description: "Data has been successfully loaded. Updating dashboard...",
-    });
+    // Reset fetch session to hide progress
+    setFetchSessionId(null);
+    setFetching(false);
+    
+    // Invalidate all queries to refresh data
     queryClient.invalidateQueries({ queryKey: ["organizations"] });
     queryClient.invalidateQueries({ queryKey: ["funding_records"] });
     queryClient.invalidateQueries({ queryKey: ["funding_metrics"] });
     queryClient.invalidateQueries({ queryKey: ["subawards-by-state"] });
+    
+    toast({
+      title: "Fetch Complete",
+      description: "Dashboard updated with new data",
+    });
   };
 
   const handleFetchNASBOData = async () => {
