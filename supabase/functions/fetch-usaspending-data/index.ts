@@ -188,31 +188,6 @@ serve(async (req) => {
     
     console.log(`Total results available: ${totalResults}, fetching up to ${totalPages} pages`);
     
-    // If no results found, update progress and return early
-    if (totalPages === 0 || totalResults === 0) {
-      await supabaseClient
-        .from("fetch_progress")
-        .update({
-          total_pages: 0,
-          current_page: 0,
-          records_inserted: 0,
-          status: "completed",
-          message: "No results found for this state and date range",
-        })
-        .eq("session_id", progressSessionId);
-      
-      return new Response(
-        JSON.stringify({
-          message: "No results found",
-          recordsAdded: 0,
-          sessionId: progressSessionId,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-    
     // Update progress with total pages
     await supabaseClient
       .from("fetch_progress")
