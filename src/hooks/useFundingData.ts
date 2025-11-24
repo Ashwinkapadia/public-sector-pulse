@@ -123,9 +123,9 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
   });
 }
 
-export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Date) {
+export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Date, verticalIds?: string[]) {
   return useQuery({
-    queryKey: ["funding_metrics", state, startDate, endDate],
+    queryKey: ["funding_metrics", state, startDate, endDate, verticalIds],
     queryFn: async () => {
       // First get organization IDs for the selected state
       let orgIds: string[] | undefined;
@@ -150,7 +150,7 @@ export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Da
       }
       
       // Get funding data with date filters
-      let fundingQuery = supabase.from("funding_records").select("organization_id, amount");
+      let fundingQuery = supabase.from("funding_records").select("organization_id, amount, vertical_id");
       
       if (orgIds) {
         fundingQuery = fundingQuery.in("organization_id", orgIds);
@@ -163,6 +163,11 @@ export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Da
 
       if (endDate) {
         fundingQuery = fundingQuery.lte("action_date", endDate.toISOString().split("T")[0]);
+      }
+
+      // Filter by verticals if specified
+      if (verticalIds && verticalIds.length > 0) {
+        fundingQuery = fundingQuery.in("vertical_id", verticalIds);
       }
 
       const { data: fundingData } = await fundingQuery;

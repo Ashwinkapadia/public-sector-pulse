@@ -30,10 +30,11 @@ interface FundingMetricsProps {
   state?: string;
   startDate?: Date;
   endDate?: Date;
+  verticalIds?: string[];
 }
 
-export function FundingMetrics({ state, startDate, endDate }: FundingMetricsProps) {
-  const { data: metrics, isLoading } = useFundingMetrics(state, startDate, endDate);
+export function FundingMetrics({ state, startDate, endDate, verticalIds }: FundingMetricsProps) {
+  const { data: metrics, isLoading } = useFundingMetrics(state, startDate, endDate, verticalIds);
 
   if (isLoading) {
     return (
