@@ -183,8 +183,8 @@ serve(async (req) => {
     const totalResults = searchData.page_metadata?.total || 0;
     const totalPages = Math.min(
       Math.ceil(totalResults / 100),
-      10
-    ); // Increased to 10 pages (max 1000 records) for better coverage
+      5
+    ); // Fetch up to 5 pages (max 500 records)
     
     console.log(`Total results available: ${totalResults}, fetching up to ${totalPages} pages`);
     
