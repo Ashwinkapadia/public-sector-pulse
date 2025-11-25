@@ -72,22 +72,24 @@ serve(async (req) => {
     console.log(`Fetching data for state: ${state}`);
 
     // Clear existing USAspending.gov data for this state before fetching new data
-    const { data: orgsToClear, error: orgsError } = await supabaseClient
+    // First, get all organizations for this state
+    const { data: orgsForState, error: orgsError } = await supabaseClient
       .from("organizations")
       .select("id")
       .eq("state", state);
 
     if (orgsError) {
-      console.error("Error fetching organizations to clear:", orgsError);
+      console.error("Error fetching organizations:", orgsError);
     }
 
-    const orgIdsToClear = (orgsToClear || []).map((org) => org.id);
+    const orgIdsForState = (orgsForState || []).map((org) => org.id);
 
-    if (orgIdsToClear.length > 0) {
+    // Only delete funding records from USAspending.gov for this state
+    if (orgIdsForState.length > 0) {
       const { data: fundingToClear, error: fundingSelectError } = await supabaseClient
         .from("funding_records")
         .select("id")
-        .in("organization_id", orgIdsToClear)
+        .in("organization_id", orgIdsForState)
         .eq("source", "USAspending.gov");
 
       if (fundingSelectError) {
@@ -96,6 +98,7 @@ serve(async (req) => {
         const fundingIdsToClear = (fundingToClear || []).map((fr) => fr.id);
 
         if (fundingIdsToClear.length > 0) {
+          // Delete subawards first
           const { error: subawardsDeleteError } = await supabaseClient
             .from("subawards")
             .delete()
@@ -105,6 +108,7 @@ serve(async (req) => {
             console.error("Error deleting existing subawards:", subawardsDeleteError);
           }
 
+          // Delete funding records
           const { error: fundingDeleteError } = await supabaseClient
             .from("funding_records")
             .delete()
@@ -113,6 +117,8 @@ serve(async (req) => {
           if (fundingDeleteError) {
             console.error("Error deleting existing funding records:", fundingDeleteError);
           }
+
+          console.log(`Cleared ${fundingIdsToClear.length} existing USAspending.gov records for ${state}`);
         }
       }
     }
