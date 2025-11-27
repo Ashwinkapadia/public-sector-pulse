@@ -186,13 +186,13 @@ serve(async (req) => {
 
     // Fetch additional pages if available
     let allResults = searchData.results || [];
-    const totalResults = searchData.page_metadata?.total || 0;
-    const totalPages = Math.min(
-      Math.ceil(totalResults / 100),
-      5
-    ); // Fetch up to 5 pages (max 500 records)
+    const hasNext = searchData.page_metadata?.hasNext ?? false;
+    const maxPages = 5;
+    const totalPages = hasNext ? maxPages : 1; // If more pages exist, fetch up to 5 pages (max 500 records)
     
-    console.log(`Total results available: ${totalResults}, fetching up to ${totalPages} pages`);
+    console.log(
+      `Page 1 fetched. hasNext=${hasNext}. Will fetch up to ${totalPages} pages (max ${maxPages}).`,
+    );
     
     // Update progress with total pages
     await supabaseClient
