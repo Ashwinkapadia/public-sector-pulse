@@ -400,6 +400,15 @@ const Index = () => {
               Clear Filters
             </Button>
             <Button
+              onClick={() => navigate("/subawards")}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              View Subawards
+            </Button>
+            <Button
               onClick={handleClearData}
               variant="destructive"
               size="sm"
