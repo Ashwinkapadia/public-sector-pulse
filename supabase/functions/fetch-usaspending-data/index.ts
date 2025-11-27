@@ -502,8 +502,114 @@ serve(async (req) => {
               .eq("session_id", progressSessionId);
           }
 
-          // Subaward fetching disabled to improve performance and reliability.
-          // TODO: Implement a separate, on-demand subaward fetch if detailed subaward data is needed.
+          // Fetch subawards for this prime award
+          const awardId = result["Award ID"];
+          if (awardId && fundingRecord?.id) {
+            try {
+              const subawardResponse = await fetch(
+                "https://api.usaspending.gov/api/v2/subawards/",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    filters: {
+                      prime_award_ids: [awardId],
+                    },
+                    fields: [
+                      "Sub-Award ID",
+                      "Subaward Number",
+                      "Recipient Name",
+                      "Subaward Amount",
+                      "Subaward Action Date",
+                      "Subaward Description",
+                      "Recipient Address",
+                      "Recipient City Name",
+                      "Recipient State Code",
+                      "Recipient Zip",
+                    ],
+                    limit: 100,
+                    page: 1,
+                  }),
+                }
+              );
+
+              if (subawardResponse.ok) {
+                const subawardData = await subawardResponse.json();
+                const subawards = subawardData.results || [];
+                
+                console.log(`Found ${subawards.length} subawards for award ${awardId}`);
+
+                for (const subaward of subawards) {
+                  try {
+                    const subawardRecipientName = subaward["Recipient Name"];
+                    const subawardAmount = parseFloat(subaward["Subaward Amount"]) || 0;
+                    const subawardDate = subaward["Subaward Action Date"];
+                    const subawardDescription = subaward["Subaward Description"];
+                    const recipientState = subaward["Recipient State Code"] || state;
+                    const recipientCity = subaward["Recipient City Name"];
+
+                    if (!subawardRecipientName || subawardAmount === 0) {
+                      continue;
+                    }
+
+                    // Check if subaward recipient organization exists
+                    let subawardOrgId: string;
+                    
+                    const { data: existingSubOrg } = await supabaseClient
+                      .from("organizations")
+                      .select("id")
+                      .eq("name", subawardRecipientName)
+                      .eq("state", recipientState)
+                      .maybeSingle();
+
+                    if (existingSubOrg) {
+                      subawardOrgId = existingSubOrg.id;
+                    } else {
+                      // Insert new subaward recipient organization
+                      const { data: newSubOrg, error: subOrgError } = await supabaseClient
+                        .from("organizations")
+                        .insert({
+                          name: subawardRecipientName,
+                          state: recipientState,
+                          city: recipientCity || null,
+                          last_updated: new Date().toISOString().split("T")[0],
+                        })
+                        .select()
+                        .single();
+
+                      if (subOrgError) {
+                        console.error("Error inserting subaward organization:", subOrgError);
+                        continue;
+                      }
+
+                      subawardOrgId = newSubOrg.id;
+                    }
+
+                    // Insert subaward record
+                    const { error: subawardError } = await supabaseClient
+                      .from("subawards")
+                      .insert({
+                        funding_record_id: fundingRecord.id,
+                        recipient_organization_id: subawardOrgId,
+                        amount: subawardAmount,
+                        award_date: subawardDate || null,
+                        description: subawardDescription || null,
+                      });
+
+                    if (subawardError) {
+                      console.error("Error inserting subaward:", subawardError);
+                    }
+                  } catch (subawardError) {
+                    console.error("Error processing subaward:", subawardError);
+                  }
+                }
+              }
+            } catch (subawardFetchError) {
+              console.error(`Error fetching subawards for award ${awardId}:`, subawardFetchError);
+            }
+          }
 
         }
       } catch (error) {
