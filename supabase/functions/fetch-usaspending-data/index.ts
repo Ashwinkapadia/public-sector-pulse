@@ -508,9 +508,9 @@ serve(async (req) => {
           
           console.log(`Processing award: ${awardId}, internal_id: ${internalId}`);
           
-          if (awardId && fundingRecord?.id) {
+          if (internalId && fundingRecord?.id) {
             try {
-              // USAspending subawards API - try with the award ID
+              // USAspending subawards API requires the internal award ID (numeric), not the FAIN
               const subawardResponse = await fetch(
                 "https://api.usaspending.gov/api/v2/subawards/",
                 {
@@ -519,7 +519,7 @@ serve(async (req) => {
                     "Content-Type": "application/json",
                   },
                   body: JSON.stringify({
-                    award_id: awardId,
+                    award_id: internalId,
                     page: 1,
                     limit: 100,
                     order: "desc",
@@ -528,7 +528,7 @@ serve(async (req) => {
                 }
               );
 
-              console.log(`Subaward API response status for ${awardId}: ${subawardResponse.status}`);
+              console.log(`Subaward API response status for award ${awardId} (internal: ${internalId}): ${subawardResponse.status}`);
 
               if (subawardResponse.ok) {
                 const subawardData = await subawardResponse.json();
