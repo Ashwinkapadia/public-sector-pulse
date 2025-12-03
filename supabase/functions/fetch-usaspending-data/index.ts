@@ -536,16 +536,34 @@ serve(async (req) => {
                 
                 console.log(`Found ${subawards.length} subawards for award ${awardId}`);
 
+                // Log first subaward structure to debug field names
+                if (subawards.length > 0) {
+                  console.log(`First subaward keys: ${Object.keys(subawards[0]).join(', ')}`);
+                }
+
                 for (const subaward of subawards) {
                   try {
-                    const subawardRecipientName = subaward["sub_awardee_or_recipient_legal"] || subaward["Recipient Name"] || subaward["subawardee_name"];
-                    const subawardAmount = parseFloat(subaward["subaward_amount"] || subaward["Subaward Amount"] || subaward["amount"]) || 0;
-                    const subawardDate = subaward["action_date"] || subaward["subaward_action_date"] || subaward["Subaward Action Date"];
-                    const subawardDescription = subaward["subaward_description"] || subaward["description"] || subaward["Subaward Description"];
-                    const recipientState = subaward["sub_awardee_or_recipient_legal_entity_state_code"] || subaward["recipient_location_state_code"] || subaward["Recipient State Code"] || state;
-                    const recipientCity = subaward["sub_awardee_or_recipient_legal_entity_city_name"] || subaward["recipient_location_city_name"] || subaward["Recipient City Name"];
+                    // USAspending API field names for subawards
+                    const subawardRecipientName = 
+                      subaward["sub_awardee_or_recipient_legal_business_name"] || 
+                      subaward["sub_awardee_or_recipient_legal_entity_name"] ||
+                      subaward["sub_awardee_or_recipient_legal"] || 
+                      subaward["recipient_name"] ||
+                      subaward["subawardee_name"];
+                    const subawardAmount = parseFloat(subaward["subaward_amount"] || subaward["amount"] || "0") || 0;
+                    const subawardDate = subaward["sub_action_date"] || subaward["action_date"] || subaward["subaward_action_date"];
+                    const subawardDescription = subaward["subaward_description"] || subaward["description"];
+                    const recipientState = 
+                      subaward["sub_legal_entity_state_code"] ||
+                      subaward["sub_awardee_or_recipient_legal_entity_state_code"] || 
+                      subaward["recipient_location_state_code"] || 
+                      state;
+                    const recipientCity = 
+                      subaward["sub_legal_entity_city_name"] ||
+                      subaward["sub_awardee_or_recipient_legal_entity_city_name"] || 
+                      subaward["recipient_location_city_name"];
 
-                    console.log(`Subaward recipient: ${subawardRecipientName}, amount: ${subawardAmount}`);
+                    console.log(`Subaward recipient: ${subawardRecipientName}, amount: ${subawardAmount}, state: ${recipientState}`);
 
                     if (!subawardRecipientName || subawardAmount === 0) {
                       console.log(`Skipping subaward - missing name or zero amount`);
