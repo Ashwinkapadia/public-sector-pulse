@@ -504,8 +504,13 @@ serve(async (req) => {
 
           // Fetch subawards for this prime award
           const awardId = result["Award ID"];
+          const internalId = result["internal_id"] || result["generated_internal_id"];
+          
+          console.log(`Processing award: ${awardId}, internal_id: ${internalId}`);
+          
           if (awardId && fundingRecord?.id) {
             try {
+              // USAspending subawards API - try with the award ID
               const subawardResponse = await fetch(
                 "https://api.usaspending.gov/api/v2/subawards/",
                 {
@@ -514,26 +519,16 @@ serve(async (req) => {
                     "Content-Type": "application/json",
                   },
                   body: JSON.stringify({
-                    filters: {
-                      prime_award_ids: [awardId],
-                    },
-                    fields: [
-                      "Sub-Award ID",
-                      "Subaward Number",
-                      "Recipient Name",
-                      "Subaward Amount",
-                      "Subaward Action Date",
-                      "Subaward Description",
-                      "Recipient Address",
-                      "Recipient City Name",
-                      "Recipient State Code",
-                      "Recipient Zip",
-                    ],
-                    limit: 100,
+                    award_id: awardId,
                     page: 1,
+                    limit: 100,
+                    order: "desc",
+                    sort: "subaward_number",
                   }),
                 }
               );
+
+              console.log(`Subaward API response status for ${awardId}: ${subawardResponse.status}`);
 
               if (subawardResponse.ok) {
                 const subawardData = await subawardResponse.json();
@@ -543,14 +538,17 @@ serve(async (req) => {
 
                 for (const subaward of subawards) {
                   try {
-                    const subawardRecipientName = subaward["Recipient Name"];
-                    const subawardAmount = parseFloat(subaward["Subaward Amount"]) || 0;
-                    const subawardDate = subaward["Subaward Action Date"];
-                    const subawardDescription = subaward["Subaward Description"];
-                    const recipientState = subaward["Recipient State Code"] || state;
-                    const recipientCity = subaward["Recipient City Name"];
+                    const subawardRecipientName = subaward["sub_awardee_or_recipient_legal"] || subaward["Recipient Name"] || subaward["subawardee_name"];
+                    const subawardAmount = parseFloat(subaward["subaward_amount"] || subaward["Subaward Amount"] || subaward["amount"]) || 0;
+                    const subawardDate = subaward["action_date"] || subaward["subaward_action_date"] || subaward["Subaward Action Date"];
+                    const subawardDescription = subaward["subaward_description"] || subaward["description"] || subaward["Subaward Description"];
+                    const recipientState = subaward["sub_awardee_or_recipient_legal_entity_state_code"] || subaward["recipient_location_state_code"] || subaward["Recipient State Code"] || state;
+                    const recipientCity = subaward["sub_awardee_or_recipient_legal_entity_city_name"] || subaward["recipient_location_city_name"] || subaward["Recipient City Name"];
+
+                    console.log(`Subaward recipient: ${subawardRecipientName}, amount: ${subawardAmount}`);
 
                     if (!subawardRecipientName || subawardAmount === 0) {
+                      console.log(`Skipping subaward - missing name or zero amount`);
                       continue;
                     }
 
@@ -600,11 +598,16 @@ serve(async (req) => {
 
                     if (subawardError) {
                       console.error("Error inserting subaward:", subawardError);
+                    } else {
+                      console.log(`Successfully inserted subaward for ${subawardRecipientName}`);
                     }
                   } catch (subawardError) {
                     console.error("Error processing subaward:", subawardError);
                   }
                 }
+              } else {
+                const errorText = await subawardResponse.text();
+                console.error(`Subaward API error for ${awardId}: ${subawardResponse.status} - ${errorText}`);
               }
             } catch (subawardFetchError) {
               console.error(`Error fetching subawards for award ${awardId}:`, subawardFetchError);
