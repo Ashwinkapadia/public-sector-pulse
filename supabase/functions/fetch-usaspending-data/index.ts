@@ -1,5 +1,9 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+
+// Declare EdgeRuntime for background tasks
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<unknown>): void;
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,19 +29,29 @@ interface RequestBody {
   sessionId?: string;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const { state, startDate, endDate, sessionId } = await req.json() as RequestBody & { sessionId?: string };
+
+    if (!state) {
+      return new Response(
+        JSON.stringify({ error: "State is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { state, startDate, endDate, sessionId } = await req.json() as RequestBody & { sessionId?: string };
-    
     // Create progress tracking session
     const progressSessionId = sessionId || crypto.randomUUID();
     
@@ -59,16 +73,44 @@ serve(async (req) => {
       console.error("Error creating progress:", progressError);
     }
 
-    if (!state) {
-      return new Response(
-        JSON.stringify({ error: "State is required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    // Start background task for heavy processing
+    EdgeRuntime.waitUntil(processData(supabaseClient, state, startDate, endDate, progressSessionId));
 
+    // Return immediately with session ID
+    return new Response(
+      JSON.stringify({
+        success: true,
+        sessionId: progressSessionId,
+        message: "Fetch started in background. Monitor progress via session ID.",
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    console.error("Error starting fetch:", error);
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+});
+
+// Background processing function
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function processData(
+  supabaseClient: any,
+  state: string,
+  startDate: string | undefined,
+  endDate: string | undefined,
+  progressSessionId: string
+) {
+  try {
     console.log(`Fetching data for state: ${state}`);
 
     // Clear existing USAspending.gov data for this state before fetching new data
@@ -82,7 +124,7 @@ serve(async (req) => {
       console.error("Error fetching organizations:", orgsError);
     }
 
-    const orgIdsForState = (orgsForState || []).map((org) => org.id);
+    const orgIdsForState = (orgsForState || []).map((org: any) => org.id);
 
     // Only delete funding records from USAspending.gov for this state
     if (orgIdsForState.length > 0) {
@@ -95,7 +137,7 @@ serve(async (req) => {
       if (fundingSelectError) {
         console.error("Error fetching funding records to clear:", fundingSelectError);
       } else {
-        const fundingIdsToClear = (fundingToClear || []).map((fr) => fr.id);
+        const fundingIdsToClear = (fundingToClear || []).map((fr: any) => fr.id);
 
         if (fundingIdsToClear.length > 0) {
           // Delete subawards first
@@ -187,11 +229,11 @@ serve(async (req) => {
     // Fetch additional pages if available
     let allResults = searchData.results || [];
     const hasNext = searchData.page_metadata?.hasNext ?? false;
-    const maxPages = 5;
-    const totalPages = hasNext ? maxPages : 1; // If more pages exist, fetch up to 5 pages (max 500 records)
+    const maxPages = 10;
+    const totalPages = hasNext ? maxPages : 1; // If more pages exist, fetch up to 10 pages (max 1000 records)
     
     console.log(
-      `Page 1 fetched. hasNext=${hasNext}. Will fetch up to ${totalPages} pages (max ${maxPages}).`,
+      `Page 1 fetched. hasNext=${hasNext}. Will fetch up to ${totalPages} pages (max ${maxPages * 100} records).`,
     );
     
     // Update progress with total pages
@@ -284,7 +326,7 @@ serve(async (req) => {
       .select("id, name");
 
     const verticalMap = new Map(
-      (existingVerticals || []).map((v) => [v.name.toLowerCase(), v.id])
+      (existingVerticals || []).map((v: any) => [v.name.toLowerCase(), v.id])
     );
 
     // Get existing grant types for CFDA matching
@@ -293,10 +335,10 @@ serve(async (req) => {
       .select("id, cfda_code, name");
 
     const grantTypeMap = new Map(
-      (grantTypes || []).map((gt) => [gt.cfda_code, gt.id])
+      (grantTypes || []).map((gt: any) => [gt.cfda_code, gt.id])
     );
     const grantTypeNameMap = new Map(
-      (grantTypes || []).map((gt) => [gt.name.toLowerCase(), gt.id])
+      (grantTypes || []).map((gt: any) => [gt.name.toLowerCase(), gt.id])
     );
 
     let recordsAdded = 0;
@@ -311,7 +353,7 @@ serve(async (req) => {
       .select("organization_id, amount, fiscal_year, source")
       .eq("source", "USAspending.gov");
     
-    existingFundingRecords?.forEach(record => {
+    existingFundingRecords?.forEach((record: any) => {
       existingRecords.add(`${record.organization_id}-${record.amount}-${record.fiscal_year}`);
     });
 
@@ -689,50 +731,21 @@ serve(async (req) => {
       })
       .eq("session_id", progressSessionId);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        recordsAdded,
-        sessionId: progressSessionId,
-        message: `Fetched and stored ${recordsAdded} funding records`,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
   } catch (error) {
-    console.error("Error in fetch-usaspending-data function:", error);
+    console.error("Error in background processing:", error);
     
-    // Try to update progress with error status
+    // Update progress with error status
     try {
-      const { sessionId } = await req.json() as { sessionId?: string };
-      if (sessionId) {
-        const supabaseClient = createClient(
-          Deno.env.get("SUPABASE_URL") ?? "",
-          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-        );
-        
-        await supabaseClient
-          .from("fetch_progress")
-          .update({
-            status: "failed",
-            message: error instanceof Error ? error.message : "Unknown error",
-            errors: [error instanceof Error ? error.message : "Unknown error"],
-          })
-          .eq("session_id", sessionId);
-      }
+      await supabaseClient
+        .from("fetch_progress")
+        .update({
+          status: "failed",
+          message: error instanceof Error ? error.message : "Unknown error",
+          errors: [error instanceof Error ? error.message : "Unknown error"],
+        })
+        .eq("session_id", progressSessionId);
     } catch (updateError) {
       console.error("Error updating progress:", updateError);
     }
-    
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
   }
-});
+}
