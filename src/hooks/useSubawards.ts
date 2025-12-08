@@ -80,15 +80,16 @@ export function useSubawardsByState(state?: string, startDate?: Date, endDate?: 
 
       if (error) throw error;
       
-      // Filter by action_date of parent funding_record on the client side
+      // Filter by award_date of the subaward itself (not the parent funding_record)
       let filteredData = data as Subaward[];
       
       if (startDate || endDate) {
         filteredData = filteredData.filter((subaward: any) => {
-          const actionDate = subaward.funding_record?.action_date;
-          if (!actionDate) return false;
+          // Use subaward's own award_date for filtering
+          const awardDate = subaward.award_date;
+          if (!awardDate) return true; // Include subawards without dates
           
-          const date = new Date(actionDate);
+          const date = new Date(awardDate);
           if (startDate && date < startDate) return false;
           if (endDate && date > endDate) return false;
           
