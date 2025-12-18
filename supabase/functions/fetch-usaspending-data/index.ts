@@ -23,7 +23,7 @@ const formatAmount = (amount: number) => {
 };
 
 interface RequestBody {
-  state: string;
+  state: string; // two-letter state code or "ALL"
   startDate?: string;
   endDate?: string;
   sessionId?: string;
@@ -74,7 +74,11 @@ Deno.serve(async (req) => {
     }
 
     // Start background task for heavy processing
-    EdgeRuntime.waitUntil(processData(supabaseClient, state, startDate, endDate, progressSessionId));
+    if (state === "ALL") {
+      EdgeRuntime.waitUntil(processAllStates(supabaseClient, startDate, endDate, progressSessionId));
+    } else {
+      EdgeRuntime.waitUntil(processData(supabaseClient, state, startDate, endDate, progressSessionId));
+    }
 
     // Return immediately with session ID
     return new Response(
@@ -101,6 +105,132 @@ Deno.serve(async (req) => {
   }
 });
 
+const US_STATE_CODES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
+  "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+  "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+  "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY",
+] as const;
+
+type UsStateCode = (typeof US_STATE_CODES)[number];
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function clearAllUsaspendingData(supabaseClient: any) {
+  const { data: fundingToClear, error: fundingSelectError } = await supabaseClient
+    .from("funding_records")
+    .select("id")
+    .eq("source", "USAspending.gov");
+
+  if (fundingSelectError) {
+    console.error("Error fetching funding records to clear:", fundingSelectError);
+    return;
+  }
+
+  const fundingIdsToClear = (fundingToClear || []).map((fr: any) => fr.id);
+  if (fundingIdsToClear.length === 0) return;
+
+  const { error: subawardsDeleteError } = await supabaseClient
+    .from("subawards")
+    .delete()
+    .in("funding_record_id", fundingIdsToClear);
+
+  if (subawardsDeleteError) {
+    console.error("Error deleting existing subawards:", subawardsDeleteError);
+  }
+
+  const { error: fundingDeleteError } = await supabaseClient
+    .from("funding_records")
+    .delete()
+    .in("id", fundingIdsToClear);
+
+  if (fundingDeleteError) {
+    console.error("Error deleting existing funding records:", fundingDeleteError);
+  }
+
+  console.log(`Cleared ${fundingIdsToClear.length} existing USAspending.gov records (ALL states)`);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function processAllStates(
+  supabaseClient: any,
+  startDate: string | undefined,
+  endDate: string | undefined,
+  progressSessionId: string,
+) {
+  try {
+    console.log("Starting ALL-states fetch...");
+
+    await supabaseClient
+      .from("fetch_progress")
+      .update({
+        total_pages: US_STATE_CODES.length,
+        current_page: 0,
+        message: `Clearing existing USAspending.gov data...`,
+      })
+      .eq("session_id", progressSessionId);
+
+    await clearAllUsaspendingData(supabaseClient);
+
+    let totalPrimeAwards = 0;
+
+    for (let i = 0; i < US_STATE_CODES.length; i++) {
+      const state = US_STATE_CODES[i] as UsStateCode;
+
+      await supabaseClient
+        .from("fetch_progress")
+        .update({
+          current_page: i + 1,
+          message: `Fetching ${state} (${i + 1}/${US_STATE_CODES.length})...`,
+        })
+        .eq("session_id", progressSessionId);
+
+      const recordsAdded = await processData(
+        supabaseClient,
+        state,
+        startDate,
+        endDate,
+        progressSessionId,
+        true,
+      );
+
+      totalPrimeAwards += recordsAdded;
+
+      // Update aggregate progress
+      await supabaseClient
+        .from("fetch_progress")
+        .update({
+          records_inserted: totalPrimeAwards,
+          message: `Fetched ${state}. Total prime awards inserted: ${totalPrimeAwards}`,
+        })
+        .eq("session_id", progressSessionId);
+    }
+
+    await supabaseClient
+      .from("fetch_progress")
+      .update({
+        status: "completed",
+        message: `Completed ALL states! Inserted ${totalPrimeAwards} prime awards total.`,
+      })
+      .eq("session_id", progressSessionId);
+  } catch (error) {
+    console.error("Error in ALL-states processing:", error);
+
+    try {
+      await supabaseClient
+        .from("fetch_progress")
+        .update({
+          status: "failed",
+          message: error instanceof Error ? error.message : "Unknown error",
+          errors: [error instanceof Error ? error.message : "Unknown error"],
+        })
+        .eq("session_id", progressSessionId);
+    } catch (updateError) {
+      console.error("Error updating progress:", updateError);
+    }
+  }
+}
+
 // Background processing function
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function processData(
@@ -108,48 +238,14 @@ async function processData(
   state: string,
   startDate: string | undefined,
   endDate: string | undefined,
-  progressSessionId: string
-) {
+  progressSessionId: string,
+  skipClear = false
+): Promise<number> {
   try {
     console.log(`Fetching data for state: ${state}`);
 
     // Clear existing USAspending.gov data before fetching new data
-    if (state === "ALL") {
-      // Clear ALL USAspending.gov prime awards + subawards
-      const { data: fundingToClear, error: fundingSelectError } = await supabaseClient
-        .from("funding_records")
-        .select("id")
-        .eq("source", "USAspending.gov");
-
-      if (fundingSelectError) {
-        console.error("Error fetching funding records to clear:", fundingSelectError);
-      } else {
-        const fundingIdsToClear = (fundingToClear || []).map((fr: any) => fr.id);
-
-        if (fundingIdsToClear.length > 0) {
-          const { error: subawardsDeleteError } = await supabaseClient
-            .from("subawards")
-            .delete()
-            .in("funding_record_id", fundingIdsToClear);
-
-          if (subawardsDeleteError) {
-            console.error("Error deleting existing subawards:", subawardsDeleteError);
-          }
-
-          const { error: fundingDeleteError } = await supabaseClient
-            .from("funding_records")
-            .delete()
-            .in("id", fundingIdsToClear);
-
-          if (fundingDeleteError) {
-            console.error("Error deleting existing funding records:", fundingDeleteError);
-          }
-
-          console.log(`Cleared ${fundingIdsToClear.length} existing USAspending.gov records (ALL states)`);
-        }
-      }
-    } else {
-      // Clear existing USAspending.gov data for this state before fetching new data
+    if (!skipClear) {
       // First, get all organizations for this state
       const { data: orgsForState, error: orgsError } = await supabaseClient
         .from("organizations")
@@ -218,16 +314,12 @@ async function processData(
         },
           body: JSON.stringify({
             filters: {
-              ...(state === "ALL"
-                ? {}
-                : {
-                    recipient_locations: [
-                      {
-                        country: "USA",
-                        state: state,
-                      },
-                    ],
-                  }),
+              recipient_locations: [
+                {
+                  country: "USA",
+                  state: state,
+                },
+              ],
               time_period: [
                 {
                   start_date: startDate || `${fiscalYear}-01-01`,
@@ -299,16 +391,12 @@ async function processData(
           },
             body: JSON.stringify({
               filters: {
-                ...(state === "ALL"
-                  ? {}
-                  : {
-                      recipient_locations: [
-                        {
-                          country: "USA",
-                          state: state,
-                        },
-                      ],
-                    }),
+                recipient_locations: [
+                  {
+                    country: "USA",
+                    state: state,
+                  },
+                ],
                 time_period: [
                   {
                     start_date: startDate || `${fiscalYear}-01-01`,
@@ -418,14 +506,6 @@ async function processData(
          const cfdaNumber = result["CFDA Number"];
          const cfdaTitle = result["CFDA Title"];
 
-         // For ALL-states searches, derive the org state from Recipient Location
-         const recipientLocation = result["Recipient Location"] as string | undefined;
-         const derivedState = (() => {
-           if (!recipientLocation) return "US";
-           const match = recipientLocation.match(/,\s*([A-Z]{2})\b/);
-           return match?.[1] || "US";
-         })();
-
         // Match grant type by CFDA code first, then by name
         let grantTypeId = null;
         if (cfdaNumber) {
@@ -520,7 +600,7 @@ async function processData(
             .from("organizations")
             .select("id")
             .eq("name", recipientName)
-            .eq("state", state === "ALL" ? derivedState : state)
+            .eq("state", state)
             .single();
 
           organizationId = existingOrg?.id;
@@ -529,7 +609,7 @@ async function processData(
             .from("organizations")
             .select("id")
             .eq("name", recipientName)
-            .eq("state", state === "ALL" ? derivedState : state)
+            .eq("state", state)
             .maybeSingle();
 
           if (existingOrg) {
@@ -540,7 +620,7 @@ async function processData(
               .from("organizations")
               .insert({
                 name: recipientName,
-                state: state === "ALL" ? derivedState : state,
+                state: state,
                 last_updated: new Date().toISOString().split("T")[0],
               })
               .select()
@@ -776,21 +856,25 @@ async function processData(
     }
 
     console.log(`Successfully added ${recordsAdded} funding records and ${subawardsAdded} subawards`);
-    
-    // Update final progress
-    await supabaseClient
-      .from("fetch_progress")
-      .update({
-        status: "completed",
-        records_inserted: recordsAdded,
-        errors,
-        message: `Completed! Inserted ${recordsAdded} prime awards and ${subawardsAdded} subawards.`,
-      })
-      .eq("session_id", progressSessionId);
+
+    if (!skipClear) {
+      // Update final progress (single-state mode)
+      await supabaseClient
+        .from("fetch_progress")
+        .update({
+          status: "completed",
+          records_inserted: recordsAdded,
+          errors,
+          message: `Completed! Inserted ${recordsAdded} prime awards and ${subawardsAdded} subawards.`,
+        })
+        .eq("session_id", progressSessionId);
+    }
+
+    return recordsAdded;
 
   } catch (error) {
     console.error("Error in background processing:", error);
-    
+
     // Update progress with error status
     try {
       await supabaseClient
@@ -804,5 +888,7 @@ async function processData(
     } catch (updateError) {
       console.error("Error updating progress:", updateError);
     }
+
+    throw error;
   }
 }
