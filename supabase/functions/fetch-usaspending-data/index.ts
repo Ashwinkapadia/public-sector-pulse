@@ -482,7 +482,6 @@ async function processData(
     const processedOrgs = new Set<string>();
     const existingRecords = new Set<string>();
     const errors: string[] = [];
-    const awardsForSubawards: { awardId: string; internalId: string | number | undefined; fundingRecordId: string }[] = [];
 
     // Get existing funding records to prevent duplicates
     const { data: existingFundingRecords } = await supabaseClient
@@ -644,8 +643,15 @@ async function processData(
           continue;
         }
 
+        // Get award IDs to store in notes for later subaward fetching
+        const awardId = result["Award ID"];
+        const internalId = result["Internal ID"] || result["internal_id"] || result["generated_internal_id"];
+        
+        // Store award IDs in notes so subawards can be fetched separately
+        const notesWithAwardIds = `From USAspending.gov - ${awardingAgency}, internal_id:${internalId || ''}, award_id:${awardId || ''}`;
+
         // Insert funding record with last_updated timestamp and action_date
-        const { data: fundingRecord, error: fundingError } = await supabaseClient
+        const { error: fundingError } = await supabaseClient
           .from("funding_records")
           .insert({
             organization_id: organizationId,
@@ -658,12 +664,10 @@ async function processData(
             action_date: actionDateStr || null,
             cfda_code: cfdaNumber || null,
             grant_type_id: grantTypeId,
-            notes: `From USAspending.gov - ${awardingAgency}`,
+            notes: notesWithAwardIds,
             source: "USAspending.gov",
             last_updated: new Date().toISOString(),
-          })
-          .select()
-          .single();
+          });
 
         if (fundingError) {
           console.error("Error inserting funding record:", fundingError);
@@ -677,23 +681,10 @@ async function processData(
               .from("fetch_progress")
               .update({
                 records_inserted: recordsAdded,
-                message: `Inserted ${recordsAdded} records...`,
+                message: `Inserted ${recordsAdded} prime awards...`,
               })
               .eq("session_id", progressSessionId);
           }
-
-          // Store award info for subaward fetching later
-           const awardId = result["Award ID"];
-           const internalId = result["Internal ID"] || result["internal_id"] || result["generated_internal_id"] || result["generated_internal_id"];
-           
-           // Queue subaward fetching - we'll process after all prime awards
-           if (fundingRecord?.id) {
-             awardsForSubawards.push({
-               awardId,
-               internalId,
-               fundingRecordId: fundingRecord.id,
-             });
-           }
         }
       } catch (error) {
         console.error("Error processing result:", error);
@@ -713,149 +704,7 @@ async function processData(
       }
     }
 
-    // Now fetch subawards for all prime awards
-    console.log(`Fetching subawards for ${awardsForSubawards.length} prime awards...`);
-    
-    await supabaseClient
-      .from("fetch_progress")
-      .update({
-        message: `Processing ${recordsAdded} prime awards, fetching subawards...`,
-      })
-      .eq("session_id", progressSessionId);
-
-    let subawardsAdded = 0;
-    const filterStartDate = startDate ? new Date(startDate) : null;
-    const filterEndDate = endDate ? new Date(endDate) : null;
-    
-    for (const award of awardsForSubawards) {
-      try {
-        // Try fetching by Award ID (FAIN) directly - the API accepts this
-        const subawardResponse = await fetch(
-          "https://api.usaspending.gov/api/v2/subawards/",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-             body: JSON.stringify({
-               award_id: award.internalId ?? award.awardId,
-               page: 1,
-               limit: 100,
-               order: "desc",
-               sort: "subaward_number",
-             }),
-          }
-        );
-
-        if (subawardResponse.ok) {
-          const subawardData = await subawardResponse.json();
-          const subawards = subawardData.results || [];
-          
-          console.log(`Found ${subawards.length} subawards for award ${award.awardId}`);
-
-          for (const subaward of subawards) {
-            try {
-              const subawardRecipientName = 
-                subaward["sub_awardee_or_recipient_legal_business_name"] || 
-                subaward["sub_awardee_or_recipient_legal_entity_name"] ||
-                subaward["sub_awardee_or_recipient_legal"] || 
-                subaward["recipient_name"] ||
-                subaward["subawardee_name"];
-              const subawardAmount = parseFloat(subaward["subaward_amount"] || subaward["amount"] || "0") || 0;
-              const subawardDate = subaward["sub_action_date"] || subaward["action_date"] || subaward["subaward_action_date"];
-              const subawardDescription = subaward["subaward_description"] || subaward["description"];
-              const recipientState = 
-                subaward["sub_legal_entity_state_code"] ||
-                subaward["sub_awardee_or_recipient_legal_entity_state_code"] || 
-                subaward["recipient_location_state_code"] || 
-                state;
-              const recipientCity = 
-                subaward["sub_legal_entity_city_name"] ||
-                subaward["sub_awardee_or_recipient_legal_entity_city_name"] || 
-                subaward["recipient_location_city_name"];
-
-              // Filter subaward by date range
-              if (subawardDate) {
-                const subawardDateObj = new Date(subawardDate);
-                if (filterStartDate && subawardDateObj < filterStartDate) {
-                  console.log(`Skipping subaward - date ${subawardDate} before start date`);
-                  continue;
-                }
-                if (filterEndDate && subawardDateObj > filterEndDate) {
-                  console.log(`Skipping subaward - date ${subawardDate} after end date`);
-                  continue;
-                }
-              }
-
-              console.log(`Subaward recipient: ${subawardRecipientName}, amount: ${subawardAmount}, state: ${recipientState}`);
-
-              if (!subawardRecipientName || subawardAmount === 0) {
-                console.log(`Skipping subaward - missing name or zero amount`);
-                continue;
-              }
-
-              // Check if subaward recipient organization exists
-              let subawardOrgId: string;
-              
-              const { data: existingSubOrg } = await supabaseClient
-                .from("organizations")
-                .select("id")
-                .eq("name", subawardRecipientName)
-                .eq("state", recipientState)
-                .maybeSingle();
-
-              if (existingSubOrg) {
-                subawardOrgId = existingSubOrg.id;
-              } else {
-                const { data: newSubOrg, error: subOrgError } = await supabaseClient
-                  .from("organizations")
-                  .insert({
-                    name: subawardRecipientName,
-                    state: recipientState,
-                    city: recipientCity || null,
-                    last_updated: new Date().toISOString().split("T")[0],
-                  })
-                  .select()
-                  .single();
-
-                if (subOrgError) {
-                  console.error("Error inserting subaward organization:", subOrgError);
-                  continue;
-                }
-
-                subawardOrgId = newSubOrg.id;
-              }
-
-              // Insert subaward record
-              const { error: subawardError } = await supabaseClient
-                .from("subawards")
-                .insert({
-                  funding_record_id: award.fundingRecordId,
-                  recipient_organization_id: subawardOrgId,
-                  amount: subawardAmount,
-                  award_date: subawardDate || null,
-                  description: subawardDescription || null,
-                });
-
-              if (subawardError) {
-                console.error("Error inserting subaward:", subawardError);
-              } else {
-                subawardsAdded++;
-                console.log(`Successfully inserted subaward for ${subawardRecipientName}`);
-              }
-            } catch (subawardError) {
-              console.error("Error processing subaward:", subawardError);
-            }
-          }
-        } else {
-          console.error(`Subaward API error for ${award.awardId}: ${subawardResponse.status}`);
-        }
-      } catch (subawardFetchError) {
-        console.error(`Error fetching subawards for award ${award.awardId}:`, subawardFetchError);
-      }
-    }
-
-    console.log(`Successfully added ${recordsAdded} funding records and ${subawardsAdded} subawards`);
+    console.log(`Successfully added ${recordsAdded} prime awards`);
 
     if (!skipClear) {
       // Update final progress (single-state mode)
@@ -865,7 +714,7 @@ async function processData(
           status: "completed",
           records_inserted: recordsAdded,
           errors,
-          message: `Completed! Inserted ${recordsAdded} prime awards and ${subawardsAdded} subawards.`,
+          message: `Completed! Inserted ${recordsAdded} prime awards. Fetch subawards separately.`,
         })
         .eq("session_id", progressSessionId);
     }

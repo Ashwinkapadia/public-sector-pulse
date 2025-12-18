@@ -1,1 +1,4 @@
 project_id = "dfobnipqgkjivupcufgv"
+
+[functions.fetch-subawards-data]
+verify_jwt = false

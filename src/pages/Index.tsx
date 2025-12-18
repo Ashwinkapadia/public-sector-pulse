@@ -27,11 +27,13 @@ const Index = () => {
   const [selectedVerticals, setSelectedVerticals] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
+  const [fetchingSubawards, setFetchingSubawards] = useState(false);
   const [fetchingNASBO, setFetchingNASBO] = useState(false);
   const [fetchingGrants, setFetchingGrants] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [fetchSessionId, setFetchSessionId] = useState<string | null>(null);
+  const [subawardsFetchSessionId, setSubawardsFetchSessionId] = useState<string | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -123,11 +125,65 @@ const Index = () => {
     queryClient.invalidateQueries({ queryKey: ["organizations"] });
     queryClient.invalidateQueries({ queryKey: ["funding_records"] });
     queryClient.invalidateQueries({ queryKey: ["funding_metrics"] });
+    
+    toast({
+      title: "Prime Awards Fetch Complete",
+      description: "Dashboard updated with new prime award data",
+    });
+  };
+
+  const handleFetchSubawardsData = async () => {
+    if (!selectedState) {
+      toast({
+        variant: "destructive",
+        title: "State Required",
+        description: "Please select a state before fetching subawards",
+      });
+      return;
+    }
+
+    setFetchingSubawards(true);
+    const sessionId = crypto.randomUUID();
+    setSubawardsFetchSessionId(sessionId);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("fetch-subawards-data", {
+        body: {
+          state: selectedState,
+          startDate: startDate?.toISOString().split("T")[0],
+          endDate: endDate?.toISOString().split("T")[0],
+          sessionId,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Subawards Fetch Started",
+        description: "Fetching subawards in background...",
+      });
+    } catch (error: any) {
+      console.error("Error fetching subawards:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to fetch subawards",
+        description: error.message || "An error occurred while fetching subawards",
+      });
+      setSubawardsFetchSessionId(null);
+    } finally {
+      setFetchingSubawards(false);
+    }
+  };
+
+  const handleSubawardsFetchComplete = () => {
+    setSubawardsFetchSessionId(null);
+    setFetchingSubawards(false);
+    
     queryClient.invalidateQueries({ queryKey: ["subawards-by-state"] });
     
     toast({
-      title: "Fetch Complete",
-      description: "Dashboard updated with new data",
+      title: "Subawards Fetch Complete",
+      description: "Subawards data updated",
     });
   };
 
@@ -491,44 +547,75 @@ const Index = () => {
                 onSelectVerticals={setSelectedVerticals}
               />
             </div>
-            <div className="mt-6 flex gap-3 justify-end flex-wrap">
-              <Button
-                onClick={handleFetchUSASpendingData}
-                disabled={fetching || !selectedState}
-                className="gap-2"
-                size="lg"
-              >
-                <RefreshCw className={`h-4 w-4 ${fetching ? "animate-spin" : ""}`} />
-                {fetching ? "Fetching..." : "Fetch USAspending.gov"}
-              </Button>
-              <Button
-                onClick={handleFetchGrantsData}
-                disabled={fetchingGrants || !selectedState}
-                className="gap-2"
-                size="lg"
-                variant="secondary"
-              >
-                <RefreshCw className={`h-4 w-4 ${fetchingGrants ? "animate-spin" : ""}`} />
-                {fetchingGrants ? "Fetching..." : "Fetch Grants.gov"}
-              </Button>
-              <Button
-                onClick={handleFetchNASBOData}
-                disabled={fetchingNASBO || !selectedState}
-                className="gap-2"
-                size="lg"
-                variant="outline"
-              >
-                <RefreshCw className={`h-4 w-4 ${fetchingNASBO ? "animate-spin" : ""}`} />
-                {fetchingNASBO ? "Fetching..." : "Fetch NASBO Data"}
-              </Button>
+            {/* Prime Awards Fetch Section */}
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Prime Awards</h3>
+              <div className="flex gap-3 flex-wrap">
+                <Button
+                  onClick={handleFetchUSASpendingData}
+                  disabled={fetching || !selectedState}
+                  className="gap-2"
+                  size="lg"
+                >
+                  <RefreshCw className={`h-4 w-4 ${fetching ? "animate-spin" : ""}`} />
+                  {fetching ? "Fetching..." : "Fetch Prime Awards (USAspending)"}
+                </Button>
+                <Button
+                  onClick={handleFetchGrantsData}
+                  disabled={fetchingGrants || !selectedState}
+                  className="gap-2"
+                  size="lg"
+                  variant="secondary"
+                >
+                  <RefreshCw className={`h-4 w-4 ${fetchingGrants ? "animate-spin" : ""}`} />
+                  {fetchingGrants ? "Fetching..." : "Fetch Grants.gov"}
+                </Button>
+                <Button
+                  onClick={handleFetchNASBOData}
+                  disabled={fetchingNASBO || !selectedState}
+                  className="gap-2"
+                  size="lg"
+                  variant="outline"
+                >
+                  <RefreshCw className={`h-4 w-4 ${fetchingNASBO ? "animate-spin" : ""}`} />
+                  {fetchingNASBO ? "Fetching..." : "Fetch NASBO Data"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Subawards Fetch Section */}
+            <div className="mt-6 pt-6 border-t">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Subawards</h3>
+              <div className="flex gap-3 flex-wrap">
+                <Button
+                  onClick={handleFetchSubawardsData}
+                  disabled={fetchingSubawards || !selectedState}
+                  className="gap-2"
+                  size="lg"
+                  variant="secondary"
+                >
+                  <RefreshCw className={`h-4 w-4 ${fetchingSubawards ? "animate-spin" : ""}`} />
+                  {fetchingSubawards ? "Fetching..." : "Fetch Subawards (USAspending)"}
+                </Button>
+                <p className="text-sm text-muted-foreground self-center">
+                  Requires prime awards to be fetched first
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Fetch Progress */}
+        {/* Prime Awards Fetch Progress */}
         {fetchSessionId && (
           <section className="mb-8">
             <FetchProgress sessionId={fetchSessionId} onComplete={handleFetchComplete} />
+          </section>
+        )}
+
+        {/* Subawards Fetch Progress */}
+        {subawardsFetchSessionId && (
+          <section className="mb-8">
+            <FetchProgress sessionId={subawardsFetchSessionId} onComplete={handleSubawardsFetchComplete} />
           </section>
         )}
 
@@ -542,13 +629,15 @@ const Index = () => {
           <FundingChart state={selectedState} />
         </section>
 
-        {/* Organizations Table */}
+        {/* Prime Awards Table */}
         <section className="mb-8">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Prime Awards</h2>
           <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} />
         </section>
 
         {/* Subawards Table */}
         <section className="mb-8">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Subawards</h2>
           <SubawardsTable state={selectedState} startDate={startDate} endDate={endDate} />
         </section>
 
