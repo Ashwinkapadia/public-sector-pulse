@@ -82,7 +82,7 @@ export function PrimeAwardSubawards({ state, startDate, endDate }: PrimeAwardSub
         .eq("source", "USAspending.gov")
         .order("amount", { ascending: false });
 
-      if (state) {
+      if (state && state !== "ALL") {
         query = query.eq("organization.state", state);
       }
 

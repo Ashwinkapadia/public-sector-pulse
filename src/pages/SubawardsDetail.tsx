@@ -45,7 +45,7 @@ export default function SubawardsDetail() {
         .order("amount", { ascending: false })
         .limit(20);
 
-      if (selectedState) {
+      if (selectedState && selectedState !== "ALL") {
         query = query.eq("organization.state", selectedState);
       }
 
@@ -103,7 +103,7 @@ export default function SubawardsDetail() {
           subawards: subawardsByFunding.get(record.id) || [],
         }));
     },
-    enabled: !!selectedState,
+    enabled: selectedState !== "",
   });
 
   return (

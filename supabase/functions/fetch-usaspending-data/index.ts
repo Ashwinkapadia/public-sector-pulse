@@ -197,6 +197,7 @@ async function processData(
           },
             fields: [
             "Award ID",
+            "Internal ID",
             "Recipient Name",
             "Award Amount",
             "Award Type",
@@ -268,10 +269,11 @@ async function processData(
                   end_date: endDate || `${fiscalYear}-12-31`,
                 },
               ],
-              award_type_codes: ["02", "03", "04", "05"],
+             award_type_codes: ["02", "03", "04", "05"],
             },
             fields: [
               "Award ID",
+              "Internal ID",
               "Recipient Name",
               "Award Amount",
               "Award Type",
@@ -345,7 +347,7 @@ async function processData(
     const processedOrgs = new Set<string>();
     const existingRecords = new Set<string>();
     const errors: string[] = [];
-    const awardsForSubawards: { awardId: string; internalId: string | undefined; fundingRecordId: string }[] = [];
+    const awardsForSubawards: { awardId: string; internalId: string | number | undefined; fundingRecordId: string }[] = [];
 
     // Get existing funding records to prevent duplicates
     const { data: existingFundingRecords } = await supabaseClient
@@ -546,17 +548,17 @@ async function processData(
           }
 
           // Store award info for subaward fetching later
-          const awardId = result["Award ID"];
-          const internalId = result["internal_id"] || result["generated_internal_id"];
-          
-          // Queue subaward fetching - we'll process after all prime awards
-          if (fundingRecord?.id) {
-            awardsForSubawards.push({
-              awardId,
-              internalId,
-              fundingRecordId: fundingRecord.id,
-            });
-          }
+           const awardId = result["Award ID"];
+           const internalId = result["Internal ID"] || result["internal_id"] || result["generated_internal_id"] || result["generated_internal_id"];
+           
+           // Queue subaward fetching - we'll process after all prime awards
+           if (fundingRecord?.id) {
+             awardsForSubawards.push({
+               awardId,
+               internalId,
+               fundingRecordId: fundingRecord.id,
+             });
+           }
         }
       } catch (error) {
         console.error("Error processing result:", error);
@@ -600,13 +602,13 @@ async function processData(
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              award_id: award.awardId,
-              page: 1,
-              limit: 100,
-              order: "desc",
-              sort: "subaward_number",
-            }),
+             body: JSON.stringify({
+               award_id: award.internalId ?? award.awardId,
+               page: 1,
+               limit: 100,
+               order: "desc",
+               sort: "subaward_number",
+             }),
           }
         );
 
