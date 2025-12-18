@@ -46,7 +46,7 @@ export function useOrganizations(state?: string) {
         .select("*")
         .order("name");
 
-      if (state) {
+      if (state && state !== "ALL") {
         query = query.eq("state", state);
       }
 
@@ -78,7 +78,7 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
     queryFn: async () => {
       // First get organization IDs for the selected state
       let orgIds: string[] | undefined;
-      if (state) {
+      if (state && state !== "ALL") {
         const { data: orgs, error: orgError } = await supabase
           .from("organizations")
           .select("id")
@@ -129,7 +129,7 @@ export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Da
     queryFn: async () => {
       // First get organization IDs for the selected state
       let orgIds: string[] | undefined;
-      if (state) {
+      if (state && state !== "ALL") {
         const { data: orgs, error: orgError } = await supabase
           .from("organizations")
           .select("id")

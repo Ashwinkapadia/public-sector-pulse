@@ -72,7 +72,7 @@ export function useSubawardsByState(state?: string, startDate?: Date, endDate?: 
         `)
         .order("amount", { ascending: false });
 
-      if (state) {
+      if (state && state !== "ALL") {
         query = query.eq("recipient_organization.state", state);
       }
 

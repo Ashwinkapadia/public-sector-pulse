@@ -71,6 +71,7 @@ export function StateSelector({ value, onChange }: StateSelectorProps) {
         <SelectValue placeholder="Select a state" />
       </SelectTrigger>
       <SelectContent className="bg-popover z-50 max-h-[300px]">
+        <SelectItem value="ALL">All states</SelectItem>
         {US_STATES.map((state) => (
           <SelectItem key={state.value} value={state.value}>
             {state.label}
