@@ -113,25 +113,12 @@ async function processData(
   try {
     console.log(`Fetching data for state: ${state}`);
 
-    // Clear existing USAspending.gov data for this state before fetching new data
-    // First, get all organizations for this state
-    const { data: orgsForState, error: orgsError } = await supabaseClient
-      .from("organizations")
-      .select("id")
-      .eq("state", state);
-
-    if (orgsError) {
-      console.error("Error fetching organizations:", orgsError);
-    }
-
-    const orgIdsForState = (orgsForState || []).map((org: any) => org.id);
-
-    // Only delete funding records from USAspending.gov for this state
-    if (orgIdsForState.length > 0) {
+    // Clear existing USAspending.gov data before fetching new data
+    if (state === "ALL") {
+      // Clear ALL USAspending.gov prime awards + subawards
       const { data: fundingToClear, error: fundingSelectError } = await supabaseClient
         .from("funding_records")
         .select("id")
-        .in("organization_id", orgIdsForState)
         .eq("source", "USAspending.gov");
 
       if (fundingSelectError) {
@@ -140,7 +127,6 @@ async function processData(
         const fundingIdsToClear = (fundingToClear || []).map((fr: any) => fr.id);
 
         if (fundingIdsToClear.length > 0) {
-          // Delete subawards first
           const { error: subawardsDeleteError } = await supabaseClient
             .from("subawards")
             .delete()
@@ -150,7 +136,6 @@ async function processData(
             console.error("Error deleting existing subawards:", subawardsDeleteError);
           }
 
-          // Delete funding records
           const { error: fundingDeleteError } = await supabaseClient
             .from("funding_records")
             .delete()
@@ -160,7 +145,59 @@ async function processData(
             console.error("Error deleting existing funding records:", fundingDeleteError);
           }
 
-          console.log(`Cleared ${fundingIdsToClear.length} existing USAspending.gov records for ${state}`);
+          console.log(`Cleared ${fundingIdsToClear.length} existing USAspending.gov records (ALL states)`);
+        }
+      }
+    } else {
+      // Clear existing USAspending.gov data for this state before fetching new data
+      // First, get all organizations for this state
+      const { data: orgsForState, error: orgsError } = await supabaseClient
+        .from("organizations")
+        .select("id")
+        .eq("state", state);
+
+      if (orgsError) {
+        console.error("Error fetching organizations:", orgsError);
+      }
+
+      const orgIdsForState = (orgsForState || []).map((org: any) => org.id);
+
+      // Only delete funding records from USAspending.gov for this state
+      if (orgIdsForState.length > 0) {
+        const { data: fundingToClear, error: fundingSelectError } = await supabaseClient
+          .from("funding_records")
+          .select("id")
+          .in("organization_id", orgIdsForState)
+          .eq("source", "USAspending.gov");
+
+        if (fundingSelectError) {
+          console.error("Error fetching funding records to clear:", fundingSelectError);
+        } else {
+          const fundingIdsToClear = (fundingToClear || []).map((fr: any) => fr.id);
+
+          if (fundingIdsToClear.length > 0) {
+            // Delete subawards first
+            const { error: subawardsDeleteError } = await supabaseClient
+              .from("subawards")
+              .delete()
+              .in("funding_record_id", fundingIdsToClear);
+
+            if (subawardsDeleteError) {
+              console.error("Error deleting existing subawards:", subawardsDeleteError);
+            }
+
+            // Delete funding records
+            const { error: fundingDeleteError } = await supabaseClient
+              .from("funding_records")
+              .delete()
+              .in("id", fundingIdsToClear);
+
+            if (fundingDeleteError) {
+              console.error("Error deleting existing funding records:", fundingDeleteError);
+            }
+
+            console.log(`Cleared ${fundingIdsToClear.length} existing USAspending.gov records for ${state}`);
+          }
         }
       }
     }
@@ -179,42 +216,47 @@ async function processData(
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          filters: {
-            recipient_locations: [
-              {
-                country: "USA",
-                state: state,
-              },
-            ],
-            time_period: [
-              {
-                start_date: startDate || `${fiscalYear}-01-01`,
-                end_date: endDate || `${fiscalYear}-12-31`,
-              },
-            ],
-            award_type_codes: ["02", "03", "04", "05"],
-          },
+          body: JSON.stringify({
+            filters: {
+              ...(state === "ALL"
+                ? {}
+                : {
+                    recipient_locations: [
+                      {
+                        country: "USA",
+                        state: state,
+                      },
+                    ],
+                  }),
+              time_period: [
+                {
+                  start_date: startDate || `${fiscalYear}-01-01`,
+                  end_date: endDate || `${fiscalYear}-12-31`,
+                },
+              ],
+              award_type_codes: ["02", "03", "04", "05"],
+            },
             fields: [
-            "Award ID",
-            "Internal ID",
-            "Recipient Name",
-            "Award Amount",
-            "Award Type",
-            "Awarding Agency",
-            "Awarding Sub Agency",
-            "Start Date",
-            "End Date",
-            "Action Date",
-            "Description",
-            "CFDA Number",
-            "CFDA Title",
-          ],
-          limit: 100,
-          page: 1,
-          order: "desc",
-          sort: "Award Amount",
-        }),
+              "Award ID",
+              "Internal ID",
+              "Recipient Name",
+              "Recipient Location",
+              "Award Amount",
+              "Award Type",
+              "Awarding Agency",
+              "Awarding Sub Agency",
+              "Start Date",
+              "End Date",
+              "Action Date",
+              "Description",
+              "CFDA Number",
+              "CFDA Title",
+            ],
+            limit: 100,
+            page: 1,
+            order: "desc",
+            sort: "Award Amount",
+          }),
       }
     );
 
@@ -255,42 +297,47 @@ async function processData(
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            filters: {
-              recipient_locations: [
-                {
-                  country: "USA",
-                  state: state,
-                },
+            body: JSON.stringify({
+              filters: {
+                ...(state === "ALL"
+                  ? {}
+                  : {
+                      recipient_locations: [
+                        {
+                          country: "USA",
+                          state: state,
+                        },
+                      ],
+                    }),
+                time_period: [
+                  {
+                    start_date: startDate || `${fiscalYear}-01-01`,
+                    end_date: endDate || `${fiscalYear}-12-31`,
+                  },
+                ],
+                award_type_codes: ["02", "03", "04", "05"],
+              },
+              fields: [
+                "Award ID",
+                "Internal ID",
+                "Recipient Name",
+                "Recipient Location",
+                "Award Amount",
+                "Award Type",
+                "Awarding Agency",
+                "Awarding Sub Agency",
+                "Start Date",
+                "End Date",
+                "Action Date",
+                "Description",
+                "CFDA Number",
+                "CFDA Title",
               ],
-              time_period: [
-                {
-                  start_date: startDate || `${fiscalYear}-01-01`,
-                  end_date: endDate || `${fiscalYear}-12-31`,
-                },
-              ],
-             award_type_codes: ["02", "03", "04", "05"],
-            },
-            fields: [
-              "Award ID",
-              "Internal ID",
-              "Recipient Name",
-              "Award Amount",
-              "Award Type",
-              "Awarding Agency",
-              "Awarding Sub Agency",
-              "Start Date",
-              "End Date",
-              "Action Date",
-              "Description",
-              "CFDA Number",
-              "CFDA Title",
-            ],
-            limit: 100,
-            page: page,
-            order: "desc",
-            sort: "Award Amount",
-          }),
+              limit: 100,
+              page: page,
+              order: "desc",
+              sort: "Award Amount",
+            }),
         }
       );
 
@@ -362,14 +409,22 @@ async function processData(
     // Process each result
     for (const result of allResults) {
       try {
-        const recipientName = result["Recipient Name"];
-        const awardAmount = parseFloat(result["Award Amount"]) || 0;
-        const awardingAgency = result["Awarding Agency"] || "Unknown";
-        const startDateStr = result["Start Date"];
-        const endDateStr = result["End Date"];
-        const actionDateStr = result["Action Date"] || startDateStr; // Use Action Date for when grant was awarded
-        const cfdaNumber = result["CFDA Number"];
-        const cfdaTitle = result["CFDA Title"];
+         const recipientName = result["Recipient Name"];
+         const awardAmount = parseFloat(result["Award Amount"]) || 0;
+         const awardingAgency = result["Awarding Agency"] || "Unknown";
+         const startDateStr = result["Start Date"];
+         const endDateStr = result["End Date"];
+         const actionDateStr = result["Action Date"] || startDateStr; // Use Action Date for when grant was awarded
+         const cfdaNumber = result["CFDA Number"];
+         const cfdaTitle = result["CFDA Title"];
+
+         // For ALL-states searches, derive the org state from Recipient Location
+         const recipientLocation = result["Recipient Location"] as string | undefined;
+         const derivedState = (() => {
+           if (!recipientLocation) return "US";
+           const match = recipientLocation.match(/,\s*([A-Z]{2})\b/);
+           return match?.[1] || "US";
+         })();
 
         // Match grant type by CFDA code first, then by name
         let grantTypeId = null;
@@ -465,7 +520,7 @@ async function processData(
             .from("organizations")
             .select("id")
             .eq("name", recipientName)
-            .eq("state", state)
+            .eq("state", state === "ALL" ? derivedState : state)
             .single();
 
           organizationId = existingOrg?.id;
@@ -474,7 +529,7 @@ async function processData(
             .from("organizations")
             .select("id")
             .eq("name", recipientName)
-            .eq("state", state)
+            .eq("state", state === "ALL" ? derivedState : state)
             .maybeSingle();
 
           if (existingOrg) {
@@ -485,7 +540,7 @@ async function processData(
               .from("organizations")
               .insert({
                 name: recipientName,
-                state: state,
+                state: state === "ALL" ? derivedState : state,
                 last_updated: new Date().toISOString().split("T")[0],
               })
               .select()
