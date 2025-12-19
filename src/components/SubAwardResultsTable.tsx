@@ -13,12 +13,19 @@ import {
 } from "@/components/ui/tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SubAwardResult } from "@/hooks/useSubAwardSearch";
+import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 
 interface SubAwardResultsTableProps {
   results: SubAwardResult[];
   total: number;
   loading: boolean;
+  page: number;
+  hasNext: boolean;
+  onNextPage: () => void;
+  onPrevPage: () => void;
+  onClear: () => void;
 }
 
 function formatCurrency(amount: number): string {
@@ -60,6 +67,11 @@ export function SubAwardResultsTable({
   results,
   total,
   loading,
+  page,
+  hasNext,
+  onNextPage,
+  onPrevPage,
+  onClear,
 }: SubAwardResultsTableProps) {
   if (loading) {
     return (
@@ -95,10 +107,21 @@ export function SubAwardResultsTable({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle>Search Results</CardTitle>
-          <Badge variant="secondary">{total} sub-awards found</Badge>
+          <div className="flex items-center gap-3">
+            <Badge variant="secondary">{total.toLocaleString()} sub-awards found</Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClear}
+              className="gap-2 text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              Clear All
+            </Button>
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -165,6 +188,35 @@ export function SubAwardResultsTable({
               ))}
             </TableBody>
           </Table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {page} · Showing {results.length} of {total.toLocaleString()} results
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onPrevPage}
+              disabled={page <= 1}
+              className="gap-1"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onNextPage}
+              disabled={!hasNext}
+              className="gap-1"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

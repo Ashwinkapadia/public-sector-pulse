@@ -16,8 +16,12 @@ export default function SubAwards() {
   const {
     loading: searching,
     results,
+    page,
+    hasNext,
     total,
     searchSubAwards,
+    clearResults,
+    goToPage,
   } = useSubAwardSearch();
 
   useEffect(() => {
@@ -141,6 +145,11 @@ export default function SubAwards() {
           results={results}
           total={total}
           loading={searching}
+          page={page}
+          hasNext={hasNext}
+          onNextPage={() => goToPage(page + 1)}
+          onPrevPage={() => goToPage(page - 1)}
+          onClear={clearResults}
         />
       </main>
     </div>

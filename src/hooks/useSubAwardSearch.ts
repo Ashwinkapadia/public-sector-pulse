@@ -34,10 +34,12 @@ export function useSubAwardSearch() {
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [total, setTotal] = useState(0);
+  const [lastParams, setLastParams] = useState<SubAwardSearchParams | null>(null);
   const { toast } = useToast();
 
   const searchSubAwards = async (params: SubAwardSearchParams) => {
     setLoading(true);
+    setLastParams(params);
 
     try {
       // Award type codes for assistance (grants) sub-awards
@@ -192,6 +194,12 @@ export function useSubAwardSearch() {
     setPage(1);
     setHasNext(false);
     setTotal(0);
+    setLastParams(null);
+  };
+
+  const goToPage = async (newPage: number) => {
+    if (!lastParams) return;
+    await searchSubAwards({ ...lastParams, page: newPage });
   };
 
   return {
@@ -202,5 +210,6 @@ export function useSubAwardSearch() {
     total,
     searchSubAwards,
     clearResults,
+    goToPage,
   };
 }
