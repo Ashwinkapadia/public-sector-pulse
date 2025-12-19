@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { StateSelector } from "@/components/StateSelector";
 import { Button } from "@/components/ui/button";
-import { LogOut, RefreshCw, Trash2, Save, FileText } from "lucide-react";
+import { LogOut, RefreshCw, Trash2, Save, FileText, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DateRangeSlider } from "@/components/DateRangeSlider";
 import { FundingMetrics } from "@/components/FundingMetrics";
@@ -463,6 +463,15 @@ const Index = () => {
             >
               <FileText className="h-4 w-4" />
               View Subawards
+            </Button>
+            <Button
+              onClick={() => navigate("/sub-awards")}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Search className="h-4 w-4" />
+              Sub-Award Intelligence
             </Button>
             <Button
               onClick={handleClearData}
