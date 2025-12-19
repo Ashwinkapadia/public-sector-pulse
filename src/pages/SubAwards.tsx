@@ -68,7 +68,8 @@ export default function SubAwards() {
     cfdaNumber: string,
     keywords: string,
     startDate: string,
-    endDate: string
+    endDate: string,
+    state: string
   ) => {
     if (!cfdaNumber.trim() && !keywords.trim()) {
       toast({
@@ -84,6 +85,7 @@ export default function SubAwards() {
       keywords,
       startDate,
       endDate,
+      state,
     });
   };
 

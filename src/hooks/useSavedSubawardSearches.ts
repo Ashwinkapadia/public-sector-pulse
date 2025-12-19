@@ -9,6 +9,7 @@ export interface SavedSubawardSearch {
   keywords: string | null;
   start_date: string | null;
   end_date: string | null;
+  state: string | null;
   created_at: string;
 }
 
@@ -44,7 +45,8 @@ export function useSavedSubawardSearches() {
     cfdaNumber: string,
     keywords: string,
     startDate: string,
-    endDate: string
+    endDate: string,
+    state: string
   ) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -64,6 +66,7 @@ export function useSavedSubawardSearches() {
         keywords: keywords.trim() || null,
         start_date: startDate || null,
         end_date: endDate || null,
+        state: state?.trim() || null,
       });
 
       if (error) throw error;
