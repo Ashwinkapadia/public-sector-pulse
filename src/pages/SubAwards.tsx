@@ -52,7 +52,12 @@ export default function SubAwards() {
     }
   };
 
-  const handleSearch = async (cfdaNumber: string, keywords: string) => {
+  const handleSearch = async (
+    cfdaNumber: string,
+    keywords: string,
+    startDate: string,
+    endDate: string
+  ) => {
     if (!cfdaNumber.trim() && !keywords.trim()) {
       toast({
         variant: "destructive",
@@ -65,8 +70,8 @@ export default function SubAwards() {
     await searchSubAwards({
       cfdaNumber,
       keywords,
-      startDate: "2024-01-01",
-      endDate: "2024-12-31",
+      startDate,
+      endDate,
     });
   };
 
