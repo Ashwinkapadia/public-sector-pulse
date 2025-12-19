@@ -44,10 +44,9 @@ export default function SubAwards() {
     if (cfdaList && formRef.current) {
       autoSearchTriggered.current = true;
 
-      // Parse and limit to 10 CFDA codes
+      // Parse all CFDA codes (no limit)
       const codes = cfdaList.split(",").map(c => c.trim()).filter(Boolean);
-      const limitedCodes = codes.slice(0, 10);
-      const cfdaString = limitedCodes.join(",");
+      const cfdaString = codes.join(",");
 
       // Set the CFDA field and trigger search with the value directly
       formRef.current.setCfdaNumber(cfdaString);
@@ -55,7 +54,7 @@ export default function SubAwards() {
       
       toast({
         title: "Sub-Awards Loaded",
-        description: `Loaded sub-awards for ${limitedCodes.length} program${limitedCodes.length > 1 ? "s" : ""} from your previous search.`,
+        description: `Loaded sub-awards for ${codes.length} program${codes.length > 1 ? "s" : ""} from your previous search.`,
       });
     }
   }, [loading, searchParams, toast]);
