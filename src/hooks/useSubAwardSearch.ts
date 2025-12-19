@@ -65,31 +65,68 @@ export function useSubAwardSearch() {
       };
 
       // Add CFDA number if provided
-      if (params.cfdaNumber?.trim()) {
-        payload.filters.program_numbers = [params.cfdaNumber.trim()];
+      const cfda = params.cfdaNumber?.trim();
+      if (cfda) {
+        // USAspending documentation/examples vary between `program_numbers` and `cfda_numbers`.
+        // We start with `program_numbers` (per original spec) and fall back to `cfda_numbers`
+        // if the API returns a 422.
+        payload.filters.program_numbers = [cfda];
       }
 
       // Add keywords if provided (keep as a single phrase)
-      if (params.keywords?.trim()) {
-        payload.filters.keywords = [params.keywords.trim()];
+      const keywords = params.keywords?.trim();
+      if (keywords) {
+        payload.filters.keywords = [keywords];
       }
 
-      const response = await fetch(
-        "https://api.usaspending.gov/api/v2/search/spending_by_award/",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+      const doRequest = async (body: any) => {
+        const res = await fetch(
+          "https://api.usaspending.gov/api/v2/search/spending_by_award/",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+          }
+        );
+
+        const text = await res.text();
+        let json: any = null;
+        try {
+          json = text ? JSON.parse(text) : null;
+        } catch {
+          json = null;
         }
-      );
+
+        return { res, json, text };
+      };
+
+      let { res: response, json: data, text } = await doRequest(payload);
+
+      // Fallback: if CFDA-only (or CFDA+keywords) yields 422, retry with cfda_numbers.
+      if (!response.ok && response.status === 422 && cfda) {
+        const retryPayload = {
+          ...payload,
+          filters: {
+            ...payload.filters,
+            cfda_numbers: [cfda],
+          },
+        };
+        delete (retryPayload.filters as any).program_numbers;
+
+        ({ res: response, json: data, text } = await doRequest(retryPayload));
+      }
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const apiMsg =
+          data?.detail ||
+          data?.message ||
+          data?.error ||
+          (typeof data === "string" ? data : null) ||
+          text?.slice(0, 300);
+        throw new Error(apiMsg || `API error: ${response.status}`);
       }
-
-      const data = await response.json();
 
       // Map API response to our interface
       const mappedResults: SubAwardResult[] = (data.results || []).map(
