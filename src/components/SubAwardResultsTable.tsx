@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -15,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SubAwardResult } from "@/hooks/useSubAwardSearch";
-import { ChevronLeft, ChevronRight, Trash2, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface SubAwardResultsTableProps {
   results: SubAwardResult[];
@@ -27,6 +28,9 @@ interface SubAwardResultsTableProps {
   onPrevPage: () => void;
   onClear: () => void;
 }
+
+type SortColumn = "subRecipient" | "primeAwardee" | "amount" | "date" | "location" | null;
+type SortDirection = "asc" | "desc";
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -65,7 +69,6 @@ function formatLocation(city: string, stateCode: string): string {
 
 function escapeCsvValue(value: string): string {
   if (!value) return "";
-  // Escape quotes and wrap in quotes if contains comma, quote, or newline
   if (value.includes(",") || value.includes('"') || value.includes("\n")) {
     return `"${value.replace(/"/g, '""')}"`;
   }
@@ -107,6 +110,44 @@ function exportToCsv(results: SubAwardResult[]) {
   URL.revokeObjectURL(url);
 }
 
+function SortableHeader({
+  column,
+  currentColumn,
+  direction,
+  onClick,
+  children,
+  className,
+}: {
+  column: SortColumn;
+  currentColumn: SortColumn;
+  direction: SortDirection;
+  onClick: (column: SortColumn) => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const isActive = currentColumn === column;
+  
+  return (
+    <TableHead
+      className={`cursor-pointer select-none hover:bg-muted/50 transition-colors ${className || ""}`}
+      onClick={() => onClick(column)}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {isActive ? (
+          direction === "asc" ? (
+            <ArrowUp className="h-3 w-3" />
+          ) : (
+            <ArrowDown className="h-3 w-3" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </div>
+    </TableHead>
+  );
+}
+
 export function SubAwardResultsTable({
   results,
   total,
@@ -117,6 +158,56 @@ export function SubAwardResultsTable({
   onPrevPage,
   onClear,
 }: SubAwardResultsTableProps) {
+  const [sortColumn, setSortColumn] = useState<SortColumn>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortedResults = useMemo(() => {
+    if (!sortColumn) return results;
+
+    return [...results].sort((a, b) => {
+      let aVal: string | number = "";
+      let bVal: string | number = "";
+
+      switch (sortColumn) {
+        case "subRecipient":
+          aVal = a.subRecipient.toLowerCase();
+          bVal = b.subRecipient.toLowerCase();
+          break;
+        case "primeAwardee":
+          aVal = a.primeAwardee.toLowerCase();
+          bVal = b.primeAwardee.toLowerCase();
+          break;
+        case "amount":
+          aVal = a.amount;
+          bVal = b.amount;
+          break;
+        case "date":
+          aVal = a.date || "";
+          bVal = b.date || "";
+          break;
+        case "location":
+          aVal = formatLocation(a.city, a.stateCode).toLowerCase();
+          bVal = formatLocation(b.city, b.stateCode).toLowerCase();
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [results, sortColumn, sortDirection]);
+
   if (loading) {
     return (
       <Card>
@@ -156,7 +247,7 @@ export function SubAwardResultsTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportToCsv(results)}
+              onClick={() => exportToCsv(sortedResults)}
               className="gap-2"
             >
               <Download className="h-4 w-4" />
@@ -179,16 +270,52 @@ export function SubAwardResultsTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Sub-Recipient</TableHead>
-                <TableHead>Funded By (Prime)</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Location</TableHead>
+                <SortableHeader
+                  column="subRecipient"
+                  currentColumn={sortColumn}
+                  direction={sortDirection}
+                  onClick={handleSort}
+                >
+                  Sub-Recipient
+                </SortableHeader>
+                <SortableHeader
+                  column="primeAwardee"
+                  currentColumn={sortColumn}
+                  direction={sortDirection}
+                  onClick={handleSort}
+                >
+                  Funded By (Prime)
+                </SortableHeader>
+                <SortableHeader
+                  column="amount"
+                  currentColumn={sortColumn}
+                  direction={sortDirection}
+                  onClick={handleSort}
+                  className="text-right"
+                >
+                  Amount
+                </SortableHeader>
+                <SortableHeader
+                  column="date"
+                  currentColumn={sortColumn}
+                  direction={sortDirection}
+                  onClick={handleSort}
+                >
+                  Date
+                </SortableHeader>
+                <SortableHeader
+                  column="location"
+                  currentColumn={sortColumn}
+                  direction={sortDirection}
+                  onClick={handleSort}
+                >
+                  Location
+                </SortableHeader>
                 <TableHead>Description</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {results.map((award, index) => (
+              {sortedResults.map((award, index) => (
                 <TableRow key={award.subAwardId || index}>
                   <TableCell className="font-medium max-w-[200px]">
                     <Tooltip>
