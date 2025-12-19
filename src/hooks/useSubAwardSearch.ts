@@ -17,6 +17,7 @@ export interface SubAwardSearchParams {
   keywords: string;
   startDate?: string;
   endDate?: string;
+  state?: string;
   page?: number;
   limit?: number;
 }
@@ -84,6 +85,14 @@ export function useSubAwardSearch() {
       const keywords = params.keywords?.trim();
       if (keywords) {
         payload.filters.keywords = [keywords];
+      }
+
+      // Add state/location filter if provided (not "ALL")
+      const state = params.state?.trim();
+      if (state && state !== "ALL") {
+        payload.filters.place_of_performance_locations = [
+          { country: "USA", state: state }
+        ];
       }
 
       const doRequest = async (body: any) => {

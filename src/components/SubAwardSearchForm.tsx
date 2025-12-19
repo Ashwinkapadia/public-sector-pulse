@@ -30,13 +30,15 @@ import {
 import { Search, Loader2, CalendarIcon, Save, FolderOpen, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SavedSubawardSearch } from "@/hooks/useSavedSubawardSearches";
+import { StateSelector } from "@/components/StateSelector";
 
 interface SubAwardSearchFormProps {
   onSearch: (
     cfdaNumber: string,
     keywords: string,
     startDate: string,
-    endDate: string
+    endDate: string,
+    state: string
   ) => void;
   loading: boolean;
   savedSearches: SavedSubawardSearch[];
@@ -45,7 +47,8 @@ interface SubAwardSearchFormProps {
     cfdaNumber: string,
     keywords: string,
     startDate: string,
-    endDate: string
+    endDate: string,
+    state: string
   ) => Promise<boolean>;
   onDeleteSearch: (id: string) => Promise<boolean>;
   savedSearchesLoading: boolean;
@@ -61,6 +64,7 @@ export function SubAwardSearchForm({
 }: SubAwardSearchFormProps) {
   const [cfdaNumber, setCfdaNumber] = useState("");
   const [keywords, setKeywords] = useState("");
+  const [state, setState] = useState("ALL");
   const [startDate, setStartDate] = useState<Date | undefined>(
     new Date("2024-01-01")
   );
@@ -77,7 +81,8 @@ export function SubAwardSearchForm({
       cfdaNumber,
       keywords,
       startDate ? format(startDate, "yyyy-MM-dd") : "2024-01-01",
-      endDate ? format(endDate, "yyyy-MM-dd") : "2024-12-31"
+      endDate ? format(endDate, "yyyy-MM-dd") : "2024-12-31",
+      state
     );
   };
 
@@ -89,7 +94,8 @@ export function SubAwardSearchForm({
       cfdaNumber,
       keywords,
       startDate ? format(startDate, "yyyy-MM-dd") : "2024-01-01",
-      endDate ? format(endDate, "yyyy-MM-dd") : "2024-12-31"
+      endDate ? format(endDate, "yyyy-MM-dd") : "2024-12-31",
+      state
     );
     setSaving(false);
     if (success) {
@@ -101,6 +107,7 @@ export function SubAwardSearchForm({
   const handleLoadSearch = (search: SavedSubawardSearch) => {
     setCfdaNumber(search.cfda_number || "");
     setKeywords(search.keywords || "");
+    setState(search.state || "ALL");
     if (search.start_date) {
       setStartDate(new Date(search.start_date));
     }
@@ -142,7 +149,7 @@ export function SubAwardSearchForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Start Date</Label>
               <Popover>
@@ -194,6 +201,13 @@ export function SubAwardSearchForm({
                   />
                 </PopoverContent>
               </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>State/Location</Label>
+              <StateSelector value={state} onChange={setState} />
+              <p className="text-xs text-muted-foreground">
+                Filter by place of performance
+              </p>
             </div>
           </div>
 
@@ -290,6 +304,9 @@ export function SubAwardSearchForm({
                       </p>
                       <p>
                         <strong>Keywords:</strong> {keywords || "Not specified"}
+                      </p>
+                      <p>
+                        <strong>State:</strong> {state === "ALL" ? "All states" : state || "Not specified"}
                       </p>
                       <p>
                         <strong>Date Range:</strong>{" "}
