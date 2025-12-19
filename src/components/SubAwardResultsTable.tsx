@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SubAwardResult } from "@/hooks/useSubAwardSearch";
-import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Download } from "lucide-react";
 
 interface SubAwardResultsTableProps {
   results: SubAwardResult[];
@@ -61,6 +61,50 @@ function formatLocation(city: string, stateCode: string): string {
   if (city) return city;
   if (stateCode) return stateCode;
   return "N/A";
+}
+
+function escapeCsvValue(value: string): string {
+  if (!value) return "";
+  // Escape quotes and wrap in quotes if contains comma, quote, or newline
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function exportToCsv(results: SubAwardResult[]) {
+  const headers = [
+    "Sub-Recipient",
+    "Funded By (Prime)",
+    "Amount",
+    "Date",
+    "Location",
+    "Description",
+  ];
+
+  const rows = results.map((award) => [
+    escapeCsvValue(award.subRecipient),
+    escapeCsvValue(award.primeAwardee),
+    award.amount.toString(),
+    award.date || "",
+    escapeCsvValue(formatLocation(award.city, award.stateCode)),
+    escapeCsvValue(award.description || ""),
+  ]);
+
+  const csvContent = [
+    headers.join(","),
+    ...rows.map((row) => row.join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `sub-awards-${new Date().toISOString().split("T")[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export function SubAwardResultsTable({
@@ -109,6 +153,15 @@ export function SubAwardResultsTable({
           <CardTitle>Search Results</CardTitle>
           <div className="flex items-center gap-3">
             <Badge variant="secondary">{total.toLocaleString()} sub-awards found</Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCsv(results)}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
             <Button
               variant="outline"
               size="sm"
