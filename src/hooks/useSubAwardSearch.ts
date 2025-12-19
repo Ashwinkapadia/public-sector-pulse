@@ -64,18 +64,14 @@ export function useSubAwardSearch() {
         page: params.page || 1,
       };
 
-      // Add CFDA/Assistance Listing number if provided (use award_type_codes for subawards)
+      // Add CFDA number if provided
       if (params.cfdaNumber?.trim()) {
-        // For subawards, use the cfda_numbers filter (not program_numbers)
-        payload.filters.cfda_numbers = [params.cfdaNumber.trim()];
+        payload.filters.program_numbers = [params.cfdaNumber.trim()];
       }
 
-      // Add keywords if provided
+      // Add keywords if provided (keep as a single phrase)
       if (params.keywords?.trim()) {
-        payload.filters.keywords = params.keywords
-          .split(",")
-          .map((k) => k.trim())
-          .filter(Boolean);
+        payload.filters.keywords = [params.keywords.trim()];
       }
 
       const response = await fetch(
