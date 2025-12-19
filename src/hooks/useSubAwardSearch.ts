@@ -68,7 +68,7 @@ export function useSubAwardSearch() {
           "Sub-Award Description",
           "Sub-Award Primary Place of Performance",
         ],
-        limit: params.limit || 50,
+        limit: params.limit || 100,
         page: params.page || 1,
       };
 

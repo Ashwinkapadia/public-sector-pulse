@@ -123,9 +123,8 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
       return;
     }
 
-    // Limit to first 10 to prevent API errors
-    const limitedCodes = uniqueCfdaCodes.slice(0, 10);
-    const cfdaList = limitedCodes.join(",");
+    // Include all unique CFDA codes (no limit)
+    const cfdaList = uniqueCfdaCodes.join(",");
 
     navigate(`/sub-awards?cfda_list=${encodeURIComponent(cfdaList)}`);
   };
