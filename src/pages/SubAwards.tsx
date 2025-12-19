@@ -8,6 +8,7 @@ import { BonterraLogo } from "@/components/BonterraLogo";
 import { SubAwardSearchForm } from "@/components/SubAwardSearchForm";
 import { SubAwardResultsTable } from "@/components/SubAwardResultsTable";
 import { useSubAwardSearch } from "@/hooks/useSubAwardSearch";
+import { useSavedSubawardSearches } from "@/hooks/useSavedSubawardSearches";
 
 export default function SubAwards() {
   const [loading, setLoading] = useState(true);
@@ -23,6 +24,13 @@ export default function SubAwards() {
     clearResults,
     goToPage,
   } = useSubAwardSearch();
+
+  const {
+    savedSearches,
+    loading: savedSearchesLoading,
+    saveSearch,
+    deleteSearch,
+  } = useSavedSubawardSearches();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -138,7 +146,14 @@ export default function SubAwards() {
         </div>
 
         {/* Search Form */}
-        <SubAwardSearchForm onSearch={handleSearch} loading={searching} />
+        <SubAwardSearchForm
+          onSearch={handleSearch}
+          loading={searching}
+          savedSearches={savedSearches}
+          onSaveSearch={saveSearch}
+          onDeleteSearch={deleteSearch}
+          savedSearchesLoading={savedSearchesLoading}
+        />
 
         {/* Results Table */}
         <SubAwardResultsTable

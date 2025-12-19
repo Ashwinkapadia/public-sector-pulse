@@ -325,6 +325,42 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_subaward_searches: {
+        Row: {
+          cfda_number: string | null
+          created_at: string
+          end_date: string | null
+          id: string
+          keywords: string | null
+          name: string
+          start_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cfda_number?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          keywords?: string | null
+          name: string
+          start_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cfda_number?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          keywords?: string | null
+          name?: string
+          start_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       subawards: {
         Row: {
           amount: number
