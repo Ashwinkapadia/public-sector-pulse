@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -13,8 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFundingRecords } from "@/hooks/useFundingData";
 import { useRepAssignments } from "@/hooks/useRepAssignments";
-import { ArrowUpDown, Download, ExternalLink } from "lucide-react";
+import { ArrowUpDown, Download, ExternalLink, Search } from "lucide-react";
 import * as XLSX from "xlsx";
+import { useToast } from "@/hooks/use-toast";
 
 
 interface FundingTableProps {
@@ -32,6 +33,8 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
   const { data: assignments } = useRepAssignments();
   const [sortField, setSortField] = useState<SortField>("funding");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const assignmentMap = useMemo(() => {
     if (!assignments) return new Map();
@@ -93,6 +96,39 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
 
     return sorted;
   }, [filteredByVerticals, sortField, sortOrder]);
+
+  const handleFindSubAwards = () => {
+    if (!sortedRecords.length) {
+      toast({
+        variant: "destructive",
+        title: "No results",
+        description: "There are no funding records to search sub-awards for.",
+      });
+      return;
+    }
+
+    // Extract unique CFDA codes from all displayed records
+    const allCfdaCodes = sortedRecords
+      .map(record => record.cfda_code || record.grant_types?.cfda_code)
+      .filter((code): code is string => !!code && code.trim() !== "");
+    
+    const uniqueCfdaCodes = [...new Set(allCfdaCodes)];
+
+    if (uniqueCfdaCodes.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No CFDA codes",
+        description: "No CFDA codes found in the current results.",
+      });
+      return;
+    }
+
+    // Limit to first 10 to prevent API errors
+    const limitedCodes = uniqueCfdaCodes.slice(0, 10);
+    const cfdaList = limitedCodes.join(",");
+
+    navigate(`/sub-awards?cfda_list=${encodeURIComponent(cfdaList)}`);
+  };
 
   const exportToCSV = () => {
     if (!sortedRecords.length) return;
@@ -170,6 +206,10 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={handleFindSubAwards} size="sm" className="gap-2">
+            <Search className="h-4 w-4" />
+            Find Sub-Awards for these Results
+          </Button>
           <Button onClick={exportToCSV} variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             CSV

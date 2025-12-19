@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef, useImperativeHandle } from "react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,11 @@ import { cn } from "@/lib/utils";
 import { SavedSubawardSearch } from "@/hooks/useSavedSubawardSearches";
 import { StateSelector } from "@/components/StateSelector";
 
+export interface SubAwardSearchFormRef {
+  setCfdaNumber: (value: string) => void;
+  triggerSearch: (overrideCfda?: string) => void;
+}
+
 interface SubAwardSearchFormProps {
   onSearch: (
     cfdaNumber: string,
@@ -54,14 +59,18 @@ interface SubAwardSearchFormProps {
   savedSearchesLoading: boolean;
 }
 
-export function SubAwardSearchForm({
-  onSearch,
-  loading,
-  savedSearches,
-  onSaveSearch,
-  onDeleteSearch,
-  savedSearchesLoading,
-}: SubAwardSearchFormProps) {
+export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSearchFormProps>(
+  function SubAwardSearchForm(
+    {
+      onSearch,
+      loading,
+      savedSearches,
+      onSaveSearch,
+      onDeleteSearch,
+      savedSearchesLoading,
+    },
+    ref
+  ) {
   const [cfdaNumber, setCfdaNumber] = useState("");
   const [keywords, setKeywords] = useState("");
   const [state, setState] = useState("ALL");
@@ -74,6 +83,21 @@ export function SubAwardSearchForm({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    setCfdaNumber: (value: string) => setCfdaNumber(value),
+    triggerSearch: (overrideCfda?: string) => {
+      const cfdaToUse = overrideCfda !== undefined ? overrideCfda : cfdaNumber;
+      onSearch(
+        cfdaToUse,
+        keywords,
+        startDate ? format(startDate, "yyyy-MM-dd") : "2024-01-01",
+        endDate ? format(endDate, "yyyy-MM-dd") : "2024-12-31",
+        state
+      );
+    },
+  }), [cfdaNumber, keywords, startDate, endDate, state, onSearch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -351,4 +375,4 @@ export function SubAwardSearchForm({
       </CardContent>
     </Card>
   );
-}
+});

@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BonterraLogo } from "@/components/BonterraLogo";
-import { SubAwardSearchForm } from "@/components/SubAwardSearchForm";
+import { SubAwardSearchForm, SubAwardSearchFormRef } from "@/components/SubAwardSearchForm";
 import { SubAwardResultsTable } from "@/components/SubAwardResultsTable";
 import { useSubAwardSearch } from "@/hooks/useSubAwardSearch";
 import { useSavedSubawardSearches } from "@/hooks/useSavedSubawardSearches";
@@ -13,7 +13,11 @@ import { useSavedSubawardSearches } from "@/hooks/useSavedSubawardSearches";
 export default function SubAwards() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const formRef = useRef<SubAwardSearchFormRef>(null);
+  const autoSearchTriggered = useRef(false);
+
   const {
     loading: searching,
     results,
@@ -31,6 +35,30 @@ export default function SubAwards() {
     saveSearch,
     deleteSearch,
   } = useSavedSubawardSearches();
+
+  // Handle cfda_list query parameter from Prime Awards page
+  useEffect(() => {
+    if (autoSearchTriggered.current || loading) return;
+
+    const cfdaList = searchParams.get("cfda_list");
+    if (cfdaList && formRef.current) {
+      autoSearchTriggered.current = true;
+
+      // Parse and limit to 10 CFDA codes
+      const codes = cfdaList.split(",").map(c => c.trim()).filter(Boolean);
+      const limitedCodes = codes.slice(0, 10);
+      const cfdaString = limitedCodes.join(",");
+
+      // Set the CFDA field and trigger search with the value directly
+      formRef.current.setCfdaNumber(cfdaString);
+      formRef.current.triggerSearch(cfdaString);
+      
+      toast({
+        title: "Sub-Awards Loaded",
+        description: `Loaded sub-awards for ${limitedCodes.length} program${limitedCodes.length > 1 ? "s" : ""} from your previous search.`,
+      });
+    }
+  }, [loading, searchParams, toast]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -149,6 +177,7 @@ export default function SubAwards() {
 
         {/* Search Form */}
         <SubAwardSearchForm
+          ref={formRef}
           onSearch={handleSearch}
           loading={searching}
           savedSearches={savedSearches}
