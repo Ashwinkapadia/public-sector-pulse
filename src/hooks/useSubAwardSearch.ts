@@ -64,9 +64,10 @@ export function useSubAwardSearch() {
         page: params.page || 1,
       };
 
-      // Add CFDA number if provided
+      // Add CFDA/Assistance Listing number if provided (use award_type_codes for subawards)
       if (params.cfdaNumber?.trim()) {
-        payload.filters.program_numbers = [params.cfdaNumber.trim()];
+        // For subawards, use the cfda_numbers filter (not program_numbers)
+        payload.filters.cfda_numbers = [params.cfdaNumber.trim()];
       }
 
       // Add keywords if provided
