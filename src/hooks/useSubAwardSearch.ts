@@ -72,13 +72,15 @@ export function useSubAwardSearch() {
         page: params.page || 1,
       };
 
-      // Add CFDA number if provided
+      // Add CFDA number(s) if provided - supports comma-separated list
       const cfda = params.cfdaNumber?.trim();
       if (cfda) {
+        // Split by comma to support multiple CFDA codes (e.g., "93.778,16.034")
+        const cfdaList = cfda.split(",").map(c => c.trim()).filter(c => c.length > 0);
         // USAspending documentation/examples vary between `program_numbers` and `cfda_numbers`.
         // We start with `program_numbers` (per original spec) and fall back to `cfda_numbers`
         // if the API returns a 422.
-        payload.filters.program_numbers = [cfda];
+        payload.filters.program_numbers = cfdaList;
       }
 
       // Add keywords if provided (keep as a single phrase)
@@ -122,11 +124,12 @@ export function useSubAwardSearch() {
 
       // Fallback: if CFDA-only (or CFDA+keywords) yields 422, retry with cfda_numbers.
       if (!response.ok && response.status === 422 && cfda) {
+        const cfdaList = cfda.split(",").map(c => c.trim()).filter(c => c.length > 0);
         const retryPayload = {
           ...payload,
           filters: {
             ...payload.filters,
-            cfda_numbers: [cfda],
+            cfda_numbers: cfdaList,
           },
         };
         delete (retryPayload.filters as any).program_numbers;
