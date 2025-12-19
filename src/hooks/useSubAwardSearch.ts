@@ -40,9 +40,15 @@ export function useSubAwardSearch() {
     setLoading(true);
 
     try {
+      // Award type codes for assistance (grants) sub-awards
+      // 02=Block Grant, 03=Formula Grant, 04=Project Grant, 05=Cooperative Agreement
+      // 06=Direct Payment, 07=Direct Loan, 08=Guaranteed Loan, 09=Insurance, 10=Direct Payment (unrestricted), 11=Other
+      const assistanceAwardTypes = ["02", "03", "04", "05", "06", "07", "08", "09", "10", "11"];
+
       const payload: any = {
         subawards: true,
         filters: {
+          award_type_codes: assistanceAwardTypes,
           time_period: [
             {
               start_date: params.startDate || "2024-01-01",
