@@ -59,12 +59,11 @@ export function useSubAwardSearch() {
         fields: [
           "Sub-Award ID",
           "Sub-Awardee Name",
-          "Prime Awardee Name",
+          "Prime Recipient Name",
           "Sub-Award Amount",
           "Sub-Award Date",
-          "Description",
-          "Sub-Award Place of Performance City",
-          "Sub-Award Place of Performance State Code",
+          "Sub-Award Description",
+          "Sub-Award Primary Place of Performance",
         ],
         limit: params.limit || 50,
         page: params.page || 1,
@@ -136,16 +135,32 @@ export function useSubAwardSearch() {
 
       // Map API response to our interface
       const mappedResults: SubAwardResult[] = (data.results || []).map(
-        (item: any) => ({
-          subAwardId: item["Sub-Award ID"] || "",
-          subRecipient: item["Sub-Awardee Name"] || "Unknown",
-          primeAwardee: item["Prime Awardee Name"] || "Unknown",
-          amount: parseFloat(item["Sub-Award Amount"]) || 0,
-          date: item["Sub-Award Date"] || "",
-          city: item["Sub-Award Place of Performance City"] || "",
-          stateCode: item["Sub-Award Place of Performance State Code"] || "",
-          description: item["Description"] || "",
-        })
+        (item: any) => {
+          // Parse location from "Sub-Award Primary Place of Performance" object or string
+          const pop = item["Sub-Award Primary Place of Performance"];
+          let city = "";
+          let stateCode = "";
+          if (pop && typeof pop === "object") {
+            city = pop.city || "";
+            stateCode = pop.state_code || pop.state || "";
+          } else if (typeof pop === "string") {
+            // Sometimes returned as "City, ST"
+            const parts = pop.split(",").map((s: string) => s.trim());
+            city = parts[0] || "";
+            stateCode = parts[1] || "";
+          }
+
+          return {
+            subAwardId: item["Sub-Award ID"] || "",
+            subRecipient: item["Sub-Awardee Name"] || "Unknown",
+            primeAwardee: item["Prime Recipient Name"] || "Unknown",
+            amount: parseFloat(item["Sub-Award Amount"]) || 0,
+            date: item["Sub-Award Date"] || "",
+            city,
+            stateCode,
+            description: item["Sub-Award Description"] || item["Description"] || "",
+          };
+        }
       );
 
       setResults(mappedResults);
