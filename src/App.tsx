@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import OrganizationDetail from "./pages/OrganizationDetail";
 import SubawardsDetail from "./pages/SubawardsDetail";
+import SubAwards from "./pages/SubAwards";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/organization/:id" element={<OrganizationDetail />} />
           <Route path="/subawards" element={<SubawardsDetail />} />
+          <Route path="/sub-awards" element={<SubAwards />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
