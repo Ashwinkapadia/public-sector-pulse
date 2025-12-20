@@ -100,11 +100,11 @@ export default function SubAwards() {
     state: string,
     agencies: Agency[]
   ) => {
-    if (!cfdaNumber.trim() && !keywords.trim()) {
+    if (!cfdaNumber.trim() && !keywords.trim() && agencies.length === 0) {
       toast({
         variant: "destructive",
         title: "Search Required",
-        description: "Please enter a CFDA number or keywords",
+        description: "Please enter a CFDA number, keywords, or select an agency",
       });
       return;
     }
