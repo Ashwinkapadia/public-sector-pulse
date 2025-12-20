@@ -9,6 +9,7 @@ import { SubAwardSearchForm, SubAwardSearchFormRef } from "@/components/SubAward
 import { SubAwardResultsTable } from "@/components/SubAwardResultsTable";
 import { useSubAwardSearch } from "@/hooks/useSubAwardSearch";
 import { useSavedSubawardSearches } from "@/hooks/useSavedSubawardSearches";
+import { Agency } from "@/components/AgencyMultiSelect";
 
 export default function SubAwards() {
   const [loading, setLoading] = useState(true);
@@ -96,7 +97,8 @@ export default function SubAwards() {
     keywords: string,
     startDate: string,
     endDate: string,
-    state: string
+    state: string,
+    agencies: Agency[]
   ) => {
     if (!cfdaNumber.trim() && !keywords.trim()) {
       toast({
@@ -113,6 +115,7 @@ export default function SubAwards() {
       startDate,
       endDate,
       state,
+      agencies,
     });
   };
 
