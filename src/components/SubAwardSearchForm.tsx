@@ -31,6 +31,7 @@ import { Search, Loader2, CalendarIcon, Save, FolderOpen, Trash2 } from "lucide-
 import { cn } from "@/lib/utils";
 import { SavedSubawardSearch } from "@/hooks/useSavedSubawardSearches";
 import { StateSelector } from "@/components/StateSelector";
+import { AgencyMultiSelect, AgencyBadges, Agency, AGENCIES } from "@/components/AgencyMultiSelect";
 
 export interface SubAwardSearchFormRef {
   setCfdaNumber: (value: string) => void;
@@ -43,7 +44,8 @@ interface SubAwardSearchFormProps {
     keywords: string,
     startDate: string,
     endDate: string,
-    state: string
+    state: string,
+    agencies: Agency[]
   ) => void;
   loading: boolean;
   savedSearches: SavedSubawardSearch[];
@@ -74,6 +76,7 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
   const [cfdaNumber, setCfdaNumber] = useState("");
   const [keywords, setKeywords] = useState("");
   const [state, setState] = useState("ALL");
+  const [agencies, setAgencies] = useState<Agency[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(
     new Date("2024-01-01")
   );
@@ -94,10 +97,11 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
         keywords,
         startDate ? format(startDate, "yyyy-MM-dd") : "2024-01-01",
         endDate ? format(endDate, "yyyy-MM-dd") : "2024-12-31",
-        state
+        state,
+        agencies
       );
     },
-  }), [cfdaNumber, keywords, startDate, endDate, state, onSearch]);
+  }), [cfdaNumber, keywords, startDate, endDate, state, agencies, onSearch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,8 +110,13 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
       keywords,
       startDate ? format(startDate, "yyyy-MM-dd") : "2024-01-01",
       endDate ? format(endDate, "yyyy-MM-dd") : "2024-12-31",
-      state
+      state,
+      agencies
     );
+  };
+
+  const handleRemoveAgency = (agency: Agency) => {
+    setAgencies(agencies.filter((a) => a !== agency));
   };
 
   const handleSave = async () => {
@@ -173,7 +182,14 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label>Awarding Agency</Label>
+              <AgencyMultiSelect value={agencies} onChange={setAgencies} />
+              <p className="text-xs text-muted-foreground">
+                Filter by federal agency
+              </p>
+            </div>
             <div className="space-y-2">
               <Label>Start Date</Label>
               <Popover>
@@ -234,6 +250,9 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
               </p>
             </div>
           </div>
+
+          {/* Active Agency Badges */}
+          <AgencyBadges agencies={agencies} onRemove={handleRemoveAgency} />
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { Agency, AGENCIES } from "@/components/AgencyMultiSelect";
 
 export interface SubAwardResult {
   subAwardId: string;
@@ -18,6 +19,7 @@ export interface SubAwardSearchParams {
   startDate?: string;
   endDate?: string;
   state?: string;
+  agencies?: Agency[];
   page?: number;
   limit?: number;
 }
@@ -95,6 +97,17 @@ export function useSubAwardSearch() {
         payload.filters.place_of_performance_locations = [
           { country: "USA", state: state }
         ];
+      }
+
+      // Add agencies filter if selected (and not all agencies)
+      const agencies = params.agencies || [];
+      const allAgenciesSelected = agencies.length === AGENCIES.length;
+      if (agencies.length > 0 && !allAgenciesSelected) {
+        payload.filters.agencies = agencies.map((agencyName) => ({
+          type: "awarding",
+          tier: "toptier",
+          name: agencyName,
+        }));
       }
 
       const doRequest = async (body: any) => {
