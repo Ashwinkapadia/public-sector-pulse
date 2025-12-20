@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { SavedSubawardSearch } from "@/hooks/useSavedSubawardSearches";
 import { StateSelector } from "@/components/StateSelector";
 import { AgencyMultiSelect, AgencyBadges, Agency, AGENCIES } from "@/components/AgencyMultiSelect";
+import { useToast } from "@/hooks/use-toast";
 
 export interface SubAwardSearchFormRef {
   setCfdaNumber: (value: string) => void;
@@ -86,6 +87,13 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
+  // Search is enabled if at least one of: CFDA, Keywords, or Agency has a value
+  const canSearch = cfdaNumber.trim() || keywords.trim() || agencies.length > 0;
+
+  // Check if searching by agency only (for warning toast)
+  const isAgencyOnlySearch = agencies.length > 0 && !cfdaNumber.trim() && !keywords.trim();
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -105,6 +113,16 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Show warning toast if searching by agency only
+    if (isAgencyOnlySearch) {
+      toast({
+        title: "Broad Search",
+        description: "Searching entire agency portfolio. Results limited to 100 most recent.",
+        variant: "default",
+      });
+    }
+    
     onSearch(
       cfdaNumber,
       keywords,
@@ -381,7 +399,7 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
               </Dialog>
             </div>
 
-            <Button type="submit" disabled={loading} className="gap-2">
+            <Button type="submit" disabled={loading || !canSearch} className="gap-2">
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
