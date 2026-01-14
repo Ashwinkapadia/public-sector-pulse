@@ -100,12 +100,35 @@ const Index = () => {
       throw new Error("Not authenticated. Please sign in again.");
     }
 
+    // Helpful debug signal when diagnosing auth/role issues
+    console.debug("invokeWithAuth", {
+      functionName,
+      userId: session.user.id,
+      hasToken: Boolean(session.access_token),
+    });
+
     return supabase.functions.invoke<T>(functionName, {
       body,
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
     });
+  };
+
+  const formatInvokeError = (error: any) => {
+    // supabase-js FunctionsHttpError often carries useful response data in `context`
+    const status = error?.context?.status ?? error?.status;
+    const body = error?.context?.body;
+
+    if (body) {
+      const bodyMsg =
+        typeof body === "string" ? body : body.error || body.message || JSON.stringify(body);
+      return status ? `${status}: ${bodyMsg}` : bodyMsg;
+    }
+
+    if (status) return `${status}: ${error?.message || "Request failed"}`;
+
+    return error?.message || "An error occurred";
   };
 
   const handleLogout = async () => {
@@ -163,7 +186,7 @@ const Index = () => {
       toast({
         variant: "destructive",
         title: "Failed to fetch data",
-        description: error.message || "An error occurred while fetching data",
+        description: formatInvokeError(error),
       });
       setFetchSessionId(null);
     } finally {
@@ -229,7 +252,7 @@ const Index = () => {
       toast({
         variant: "destructive",
         title: "Failed to fetch subawards",
-        description: error.message || "An error occurred while fetching subawards",
+        description: formatInvokeError(error),
       });
       setSubawardsFetchSessionId(null);
     } finally {
@@ -293,7 +316,7 @@ const Index = () => {
       toast({
         variant: "destructive",
         title: "Failed to fetch NASBO data",
-        description: error.message || "An error occurred while fetching NASBO data",
+        description: formatInvokeError(error),
       });
     } finally {
       setFetchingNASBO(false);
@@ -344,7 +367,7 @@ const Index = () => {
       toast({
         variant: "destructive",
         title: "Failed to fetch Grants.gov data",
-        description: error.message || "An error occurred while fetching Grants.gov data",
+        description: formatInvokeError(error),
       });
     } finally {
       setFetchingGrants(false);
