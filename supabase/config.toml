@@ -2,3 +2,12 @@ project_id = "dfobnipqgkjivupcufgv"
 
 [functions.fetch-subawards-data]
 verify_jwt = false
+
+[functions.fetch-usaspending-data]
+verify_jwt = false
+
+[functions.fetch-grants-data]
+verify_jwt = false
+
+[functions.fetch-nasbo-data]
+verify_jwt = false
