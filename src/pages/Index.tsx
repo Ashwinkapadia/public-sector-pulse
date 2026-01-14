@@ -60,6 +60,26 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const invokeWithAuth = async <T = any>(
+    functionName: string,
+    body: Record<string, unknown>
+  ) => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error("Not authenticated. Please sign in again.");
+    }
+
+    return supabase.functions.invoke<T>(functionName, {
+      body,
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+  };
+
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -88,13 +108,11 @@ const Index = () => {
     setFetchSessionId(sessionId);
     
     try {
-      const { data, error } = await supabase.functions.invoke("fetch-usaspending-data", {
-        body: {
-          state: selectedState,
-          startDate: startDate?.toISOString().split("T")[0],
-          endDate: endDate?.toISOString().split("T")[0],
-          sessionId,
-        },
+      const { data, error } = await invokeWithAuth("fetch-usaspending-data", {
+        state: selectedState,
+        startDate: startDate?.toISOString().split("T")[0],
+        endDate: endDate?.toISOString().split("T")[0],
+        sessionId,
       });
 
       if (error) throw error;
@@ -147,13 +165,11 @@ const Index = () => {
     setSubawardsFetchSessionId(sessionId);
     
     try {
-      const { data, error } = await supabase.functions.invoke("fetch-subawards-data", {
-        body: {
-          state: selectedState,
-          startDate: startDate?.toISOString().split("T")[0],
-          endDate: endDate?.toISOString().split("T")[0],
-          sessionId,
-        },
+      const { data, error } = await invokeWithAuth("fetch-subawards-data", {
+        state: selectedState,
+        startDate: startDate?.toISOString().split("T")[0],
+        endDate: endDate?.toISOString().split("T")[0],
+        sessionId,
       });
 
       if (error) throw error;
@@ -200,12 +216,10 @@ const Index = () => {
     setFetchingNASBO(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke("fetch-nasbo-data", {
-        body: {
-          state: selectedState,
-          startDate: startDate?.toISOString().split("T")[0],
-          endDate: endDate?.toISOString().split("T")[0],
-        },
+      const { data, error } = await invokeWithAuth("fetch-nasbo-data", {
+        state: selectedState,
+        startDate: startDate?.toISOString().split("T")[0],
+        endDate: endDate?.toISOString().split("T")[0],
       });
 
       if (error) throw error;
@@ -244,12 +258,10 @@ const Index = () => {
     setFetchingGrants(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke("fetch-grants-data", {
-        body: {
-          state: selectedState,
-          startDate: startDate?.toISOString().split("T")[0],
-          endDate: endDate?.toISOString().split("T")[0],
-        },
+      const { data, error } = await invokeWithAuth("fetch-grants-data", {
+        state: selectedState,
+        startDate: startDate?.toISOString().split("T")[0],
+        endDate: endDate?.toISOString().split("T")[0],
       });
 
       if (error) throw error;
