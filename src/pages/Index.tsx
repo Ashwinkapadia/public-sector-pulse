@@ -26,6 +26,7 @@ const Index = () => {
   const [endDate, setEndDate] = useState<Date>();
   const [selectedVerticals, setSelectedVerticals] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [fetching, setFetching] = useState(false);
   const [fetchingSubawards, setFetchingSubawards] = useState(false);
   const [fetchingNASBO, setFetchingNASBO] = useState(false);
@@ -41,20 +42,47 @@ const Index = () => {
   const saveSearchMutation = useSaveSearch();
   const deleteSearchMutation = useDeleteSearch();
 
+  const refreshAdminStatus = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user?.id) {
+      setIsAdmin(null);
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("has_role", {
+      _user_id: session.user.id,
+      _role: "admin",
+    });
+
+    if (error) {
+      console.error("Error checking admin role:", error);
+      setIsAdmin(false);
+      return;
+    }
+
+    setIsAdmin(Boolean(data));
+  };
+
   useEffect(() => {
     // Check if user is authenticated
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         navigate("/auth");
+        return;
       }
+      await refreshAdminStatus();
       setLoading(false);
     });
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) {
+        setIsAdmin(null);
         navigate("/auth");
+        return;
       }
+      await refreshAdminStatus();
     });
 
     return () => subscription.unsubscribe();
@@ -94,6 +122,15 @@ const Index = () => {
   };
 
   const handleFetchUSASpendingData = async () => {
+    if (isAdmin === false) {
+      toast({
+        variant: "destructive",
+        title: "Admin access required",
+        description: "Your account does not have permission to run data imports.",
+      });
+      return;
+    }
+
     if (!selectedState) {
       toast({
         variant: "destructive",
@@ -151,6 +188,15 @@ const Index = () => {
   };
 
   const handleFetchSubawardsData = async () => {
+    if (isAdmin === false) {
+      toast({
+        variant: "destructive",
+        title: "Admin access required",
+        description: "Your account does not have permission to run data imports.",
+      });
+      return;
+    }
+
     if (!selectedState) {
       toast({
         variant: "destructive",
@@ -204,6 +250,15 @@ const Index = () => {
   };
 
   const handleFetchNASBOData = async () => {
+    if (isAdmin === false) {
+      toast({
+        variant: "destructive",
+        title: "Admin access required",
+        description: "Your account does not have permission to run data imports.",
+      });
+      return;
+    }
+
     if (!selectedState) {
       toast({
         variant: "destructive",
@@ -246,6 +301,15 @@ const Index = () => {
   };
 
   const handleFetchGrantsData = async () => {
+    if (isAdmin === false) {
+      toast({
+        variant: "destructive",
+        title: "Admin access required",
+        description: "Your account does not have permission to run data imports.",
+      });
+      return;
+    }
+
     if (!selectedState) {
       toast({
         variant: "destructive",
