@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.fetch-nasbo-data]
 verify_jwt = false
+
+[functions.admin-clear-data]
+verify_jwt = false

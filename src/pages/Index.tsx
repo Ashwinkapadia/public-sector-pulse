@@ -387,29 +387,18 @@ const Index = () => {
 
   const handleClearData = async () => {
     try {
-      // Delete subawards first (due to foreign key constraints)
-      const { error: subawardsError } = await supabase
-        .from("subawards")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000");
+      // Use secure edge function for bulk deletion with audit trail
+      const { data, error } = await invokeWithAuth("admin-clear-data", {});
 
-      if (subawardsError) throw subawardsError;
-
-      // Delete funding records next
-      const { error: fundingError } = await supabase
-        .from("funding_records")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000");
-
-      if (fundingError) throw fundingError;
-
-      // Delete organizations
-      const { error: orgError } = await supabase
-        .from("organizations")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000");
-
-      if (orgError) throw orgError;
+      if (error) {
+        const errorData = formatInvokeError(error);
+        if (errorData.status === 401) {
+          throw new Error("Authentication required. Please log in again.");
+        } else if (errorData.status === 403) {
+          throw new Error("Admin privileges required for this operation.");
+        }
+        throw new Error(errorData.message || "Failed to clear data");
+      }
 
       // Reset local filters and state
       setSelectedState(undefined);
@@ -424,10 +413,10 @@ const Index = () => {
       queryClient.invalidateQueries({ queryKey: ["funding_metrics"] });
       queryClient.invalidateQueries({ queryKey: ["subawards-by-state"] });
 
+      const deleted = data?.deleted || {};
       toast({
         title: "Data cleared",
-        description:
-          "All funding records, subawards, and organizations have been removed from the dashboard",
+        description: `Removed ${deleted.subawards || 0} subawards, ${deleted.funding_records || 0} funding records, and ${deleted.organizations || 0} organizations`,
       });
     } catch (error: any) {
       toast({
