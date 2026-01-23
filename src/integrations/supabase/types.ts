@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       fetch_progress: {
         Row: {
           created_at: string
@@ -28,6 +52,7 @@ export type Database = {
           status: string
           total_pages: number | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -42,6 +67,7 @@ export type Database = {
           status?: string
           total_pages?: number | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -56,6 +82,7 @@ export type Database = {
           status?: string
           total_pages?: number | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
