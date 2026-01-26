@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useFundingRecords } from "@/hooks/useFundingData";
 import { useRepAssignments } from "@/hooks/useRepAssignments";
 import { ArrowUpDown, Download, ExternalLink, Search } from "lucide-react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -155,21 +155,41 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
     window.URL.revokeObjectURL(url);
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (!sortedRecords.length) return;
 
-    const data = sortedRecords.map(record => ({
-      Organization: record.organizations.name,
-      Vertical: record.verticals.name,
-      Funding: Number(record.amount),
-      Status: record.status,
-      "Last Updated": record.organizations.last_updated || "N/A",
-    }));
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Funding Records");
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Funding Records");
-    XLSX.writeFile(wb, `funding-records-${new Date().toISOString().split("T")[0]}.xlsx`);
+    // Add headers
+    worksheet.columns = [
+      { header: "Organization", key: "organization", width: 30 },
+      { header: "Vertical", key: "vertical", width: 20 },
+      { header: "Funding", key: "funding", width: 15 },
+      { header: "Status", key: "status", width: 15 },
+      { header: "Last Updated", key: "lastUpdated", width: 15 },
+    ];
+
+    // Add rows
+    sortedRecords.forEach(record => {
+      worksheet.addRow({
+        organization: record.organizations.name,
+        vertical: record.verticals.name,
+        funding: Number(record.amount),
+        status: record.status,
+        lastUpdated: record.organizations.last_updated || "N/A",
+      });
+    });
+
+    // Generate and download file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `funding-records-${new Date().toISOString().split("T")[0]}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   if (isLoading) {

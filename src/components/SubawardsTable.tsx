@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useSubawardsByState } from "@/hooks/useSubawards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUpDown, Download } from "lucide-react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 interface SubawardsTableProps {
   state?: string;
@@ -99,22 +99,41 @@ export function SubawardsTable({ state, startDate, endDate }: SubawardsTableProp
     window.URL.revokeObjectURL(url);
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (!sortedSubawards.length) return;
 
-    const worksheet = XLSX.utils.json_to_sheet(
-      sortedSubawards.map(subaward => ({
-        "Recipient Organization": subaward.recipient_organization?.name || "Unknown",
-        "Location": `${subaward.recipient_organization?.city ? subaward.recipient_organization.city + ", " : ""}${subaward.recipient_organization?.state || "N/A"}`,
-        "Amount": Number(subaward.amount),
-        "Description": subaward.description || "—",
-        "Award Date": subaward.award_date ? new Date(subaward.award_date).toLocaleDateString() : "—",
-      }))
-    );
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Subawards");
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Subawards");
-    XLSX.writeFile(workbook, `subawards-${new Date().toISOString().split("T")[0]}.xlsx`);
+    // Add headers
+    worksheet.columns = [
+      { header: "Recipient Organization", key: "organization", width: 30 },
+      { header: "Location", key: "location", width: 20 },
+      { header: "Amount", key: "amount", width: 15 },
+      { header: "Description", key: "description", width: 40 },
+      { header: "Award Date", key: "awardDate", width: 15 },
+    ];
+
+    // Add rows
+    sortedSubawards.forEach(subaward => {
+      worksheet.addRow({
+        organization: subaward.recipient_organization?.name || "Unknown",
+        location: `${subaward.recipient_organization?.city ? subaward.recipient_organization.city + ", " : ""}${subaward.recipient_organization?.state || "N/A"}`,
+        amount: Number(subaward.amount),
+        description: subaward.description || "—",
+        awardDate: subaward.award_date ? new Date(subaward.award_date).toLocaleDateString() : "—",
+      });
+    });
+
+    // Generate and download file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `subawards-${new Date().toISOString().split("T")[0]}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const formatCurrency = (amount: number) => {
