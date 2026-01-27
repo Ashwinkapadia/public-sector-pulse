@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.admin-clear-data]
 verify_jwt = false
+
+[functions.push-to-clay]
+verify_jwt = false

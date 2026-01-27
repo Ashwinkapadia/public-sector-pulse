@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SubAwardResult } from "@/hooks/useSubAwardSearch";
 import { ChevronLeft, ChevronRight, Trash2, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { PushToClayButton } from "@/components/PushToClayButton";
 
 interface SubAwardResultsTableProps {
   results: SubAwardResult[];
@@ -244,6 +245,19 @@ export function SubAwardResultsTable({
           <CardTitle>Search Results</CardTitle>
           <div className="flex items-center gap-3">
             <Badge variant="secondary">{total.toLocaleString()} sub-awards found</Badge>
+            <PushToClayButton
+              dataType="subawards"
+              records={sortedResults.map(award => ({
+                subAwardId: award.subAwardId,
+                subRecipient: award.subRecipient,
+                primeAwardee: award.primeAwardee,
+                amount: award.amount,
+                date: award.date || null,
+                city: award.city || null,
+                stateCode: award.stateCode || null,
+                description: award.description || null,
+              }))}
+            />
             <Button
               variant="outline"
               size="sm"

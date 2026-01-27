@@ -13,6 +13,7 @@ import { useSubawardsByState } from "@/hooks/useSubawards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUpDown, Download } from "lucide-react";
 import ExcelJS from "exceljs";
+import { PushToClayButton } from "@/components/PushToClayButton";
 
 interface SubawardsTableProps {
   state?: string;
@@ -177,6 +178,18 @@ export function SubawardsTable({ state, startDate, endDate }: SubawardsTableProp
           </p>
         </div>
         <div className="flex gap-2">
+          <PushToClayButton
+            dataType="subawards"
+            records={sortedSubawards.map(subaward => ({
+              id: subaward.id,
+              recipient_organization: subaward.recipient_organization?.name || "Unknown",
+              city: subaward.recipient_organization?.city || null,
+              state: subaward.recipient_organization?.state || null,
+              amount: Number(subaward.amount),
+              description: subaward.description || null,
+              award_date: subaward.award_date || null,
+            }))}
+          />
           <Button
             variant="outline"
             size="sm"
