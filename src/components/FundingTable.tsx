@@ -16,6 +16,7 @@ import { useRepAssignments } from "@/hooks/useRepAssignments";
 import { ArrowUpDown, Download, ExternalLink, Search } from "lucide-react";
 import ExcelJS from "exceljs";
 import { useToast } from "@/hooks/use-toast";
+import { PushToClayButton } from "@/components/PushToClayButton";
 
 
 interface FundingTableProps {
@@ -229,6 +230,21 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
             <Search className="h-4 w-4" />
             Find Sub-Awards for these Results
           </Button>
+          <PushToClayButton
+            dataType="funding_records"
+            records={sortedRecords.map(record => ({
+              id: record.id,
+              organization_name: record.organizations.name,
+              organization_id: record.organization_id,
+              vertical: record.verticals.name,
+              cfda_code: record.cfda_code || record.grant_types?.cfda_code || null,
+              grant_type: record.grant_types?.name || null,
+              amount: Number(record.amount),
+              status: record.status,
+              last_updated: record.organizations.last_updated || null,
+              source: (record as any).source || "USAspending",
+            }))}
+          />
           <Button onClick={exportToCSV} variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             CSV
