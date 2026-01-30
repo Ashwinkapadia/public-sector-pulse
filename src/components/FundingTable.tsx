@@ -26,7 +26,7 @@ interface FundingTableProps {
   endDate?: Date;
 }
 
-type SortField = "organization" | "vertical" | "funding" | "status" | "lastUpdated";
+type SortField = "organization" | "vertical" | "funding" | "status" | "lastUpdated" | "source";
 type SortOrder = "asc" | "desc";
 
 export function FundingTable({ state, verticalIds, startDate, endDate }: FundingTableProps) {
@@ -85,6 +85,10 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
         case "lastUpdated":
           aVal = a.organizations.last_updated || "";
           bVal = b.organizations.last_updated || "";
+          break;
+        case "source":
+          aVal = ((a as any).source || "USAspending").toLowerCase();
+          bVal = ((b as any).source || "USAspending").toLowerCase();
           break;
         default:
           return 0;
@@ -316,7 +320,17 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
-              <TableHead>Source</TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSort("source")}
+                  className="flex items-center gap-1 hover:bg-transparent"
+                >
+                  Source
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
+              </TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>

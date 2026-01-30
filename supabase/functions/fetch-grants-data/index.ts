@@ -168,16 +168,33 @@ serve(async (req) => {
           if (detailResponse.ok) {
             const detailData = await detailResponse.json();
             const synopsis = detailData.data?.synopsis;
-            const amountString =
-              synopsis?.awardCeiling ??
-              synopsis?.awardCeilingFormatted ??
-              synopsis?.awardFloor ??
-              synopsis?.awardFloorFormatted ??
-              "0";
-
-            const parsedAmount = parseFloat(amountString);
-            if (!Number.isNaN(parsedAmount)) {
-              awardAmount = parsedAmount;
+            console.log(`Synopsis data for ${oppNumber}:`, JSON.stringify(synopsis).substring(0, 500));
+            
+            // Try multiple amount fields in order of preference
+            const amountCandidates = [
+              synopsis?.awardCeiling,
+              synopsis?.awardCeilingFormatted,
+              synopsis?.awardFloor,
+              synopsis?.awardFloorFormatted,
+              synopsis?.estimatedTotalProgramFunding,
+              synopsis?.estimatedFunding,
+            ].filter(v => v !== undefined && v !== null);
+            
+            for (const candidate of amountCandidates) {
+              // Handle both numeric and string formats (e.g., "$1,000,000" or "1000000")
+              let amountString = String(candidate);
+              // Remove currency symbols, commas, and whitespace
+              amountString = amountString.replace(/[$,\s]/g, '');
+              const parsedAmount = parseFloat(amountString);
+              if (!Number.isNaN(parsedAmount) && parsedAmount > 0) {
+                awardAmount = parsedAmount;
+                console.log(`Parsed award amount for ${oppNumber}: ${awardAmount} from "${candidate}"`);
+                break;
+              }
+            }
+            
+            if (awardAmount === 0) {
+              console.log(`No valid award amount found for ${oppNumber}, candidates were:`, amountCandidates);
             }
           } else {
             console.error(`fetchOpportunity failed for ${oppNumber}: ${detailResponse.status}`);
