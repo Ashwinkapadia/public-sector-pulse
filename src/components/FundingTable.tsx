@@ -87,8 +87,8 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
           bVal = b.organizations.last_updated || "";
           break;
         case "source":
-          aVal = ((a as any).source || "USAspending").toLowerCase();
-          bVal = ((b as any).source || "USAspending").toLowerCase();
+          aVal = (a.source || "USAspending").toLowerCase();
+          bVal = (b.source || "USAspending").toLowerCase();
           break;
         default:
           return 0;
@@ -246,7 +246,7 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
               amount: Number(record.amount),
               status: record.status,
               last_updated: record.organizations.last_updated || null,
-              source: (record as any).source || "USAspending",
+              source: record.source || "USAspending",
             }))}
           />
           <Button onClick={exportToCSV} variant="outline" size="sm">
@@ -373,7 +373,7 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {(record as any).source || 'USAspending'}
+                        {record.source || 'USAspending'}
                       </Badge>
                     </TableCell>
                     <TableCell>

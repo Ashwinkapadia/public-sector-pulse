@@ -26,6 +26,8 @@ interface FundingRecord {
   notes: string | null;
   grant_type_id: string | null;
   cfda_code: string | null;
+  source: string;
+  action_date: string | null;
   organizations: Organization;
   verticals: Vertical;
   grant_types?: {
@@ -91,11 +93,23 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
         if (orgIds.length === 0) return [];
       }
 
-      // Build the main query
+      // Build the main query - include source field explicitly
       let query = supabase
         .from("funding_records")
         .select(`
-          *,
+          id,
+          organization_id,
+          vertical_id,
+          amount,
+          status,
+          fiscal_year,
+          date_range_start,
+          date_range_end,
+          notes,
+          grant_type_id,
+          cfda_code,
+          source,
+          action_date,
           organizations (*),
           verticals (*),
           grant_types (*)
