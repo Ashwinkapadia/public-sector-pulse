@@ -13,7 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFundingRecords } from "@/hooks/useFundingData";
 import { useRepAssignments } from "@/hooks/useRepAssignments";
-import { ArrowUpDown, Download, ExternalLink, Search } from "lucide-react";
+import { ArrowUpDown, Download, ExternalLink, Search, Users } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import ExcelJS from "exceljs";
 import { useToast } from "@/hooks/use-toast";
 import { PushToClayButton } from "@/components/PushToClayButton";
@@ -26,7 +28,7 @@ interface FundingTableProps {
   endDate?: Date;
 }
 
-type SortField = "organization" | "vertical" | "funding" | "status" | "lastUpdated" | "source";
+type SortField = "organization" | "vertical" | "funding" | "status" | "awardDate" | "source";
 type SortOrder = "asc" | "desc";
 
 export function FundingTable({ state, verticalIds, startDate, endDate }: FundingTableProps) {
@@ -34,6 +36,7 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
   const { data: assignments } = useRepAssignments();
   const [sortField, setSortField] = useState<SortField>("funding");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [showUniqueOrgs, setShowUniqueOrgs] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -82,9 +85,9 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
           aVal = a.status.toLowerCase();
           bVal = b.status.toLowerCase();
           break;
-        case "lastUpdated":
-          aVal = a.organizations.last_updated || "";
-          bVal = b.organizations.last_updated || "";
+        case "awardDate":
+          aVal = a.action_date || a.date_range_start || "";
+          bVal = b.action_date || b.date_range_start || "";
           break;
         case "source":
           aVal = (a.source || "USAspending").toLowerCase();
@@ -102,8 +105,22 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
     return sorted;
   }, [filteredByVerticals, sortField, sortOrder]);
 
+  // Deduplicate to show only one record per organization (highest funding)
+  const displayRecords = useMemo(() => {
+    if (!showUniqueOrgs) return sortedRecords;
+    
+    const orgMap = new Map<string, typeof sortedRecords[0]>();
+    for (const record of sortedRecords) {
+      const existing = orgMap.get(record.organization_id);
+      if (!existing || Number(record.amount) > Number(existing.amount)) {
+        orgMap.set(record.organization_id, record);
+      }
+    }
+    return Array.from(orgMap.values()).sort((a, b) => Number(b.amount) - Number(a.amount));
+  }, [sortedRecords, showUniqueOrgs]);
+
   const handleFindSubAwards = () => {
-    if (!sortedRecords.length) {
+    if (!displayRecords.length) {
       toast({
         variant: "destructive",
         title: "No results",
@@ -113,7 +130,7 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
     }
 
     // Extract unique CFDA codes from all displayed records
-    const allCfdaCodes = sortedRecords
+    const allCfdaCodes = displayRecords
       .map(record => record.cfda_code || record.grant_types?.cfda_code)
       .filter((code): code is string => !!code && code.trim() !== "");
     
@@ -135,15 +152,16 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
   };
 
   const exportToCSV = () => {
-    if (!sortedRecords.length) return;
+    if (!displayRecords.length) return;
 
-    const headers = ["Organization", "Vertical", "Funding", "Status", "Last Updated"];
-    const rows = sortedRecords.map(record => [
+    const headers = ["Organization", "Vertical", "Funding", "Status", "Award Date", "Source"];
+    const rows = displayRecords.map(record => [
       record.organizations.name,
       record.verticals.name,
       Number(record.amount),
       record.status,
-      record.organizations.last_updated || "N/A",
+      record.action_date || record.date_range_start || "N/A",
+      record.source || "USAspending",
     ]);
 
     const csvContent = [
@@ -161,7 +179,7 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
   };
 
   const exportToExcel = async () => {
-    if (!sortedRecords.length) return;
+    if (!displayRecords.length) return;
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Funding Records");
@@ -172,17 +190,19 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
       { header: "Vertical", key: "vertical", width: 20 },
       { header: "Funding", key: "funding", width: 15 },
       { header: "Status", key: "status", width: 15 },
-      { header: "Last Updated", key: "lastUpdated", width: 15 },
+      { header: "Award Date", key: "awardDate", width: 15 },
+      { header: "Source", key: "source", width: 15 },
     ];
 
     // Add rows
-    sortedRecords.forEach(record => {
+    displayRecords.forEach(record => {
       worksheet.addRow({
         organization: record.organizations.name,
         vertical: record.verticals.name,
         funding: Number(record.amount),
         status: record.status,
-        lastUpdated: record.organizations.last_updated || "N/A",
+        awardDate: record.action_date || record.date_range_start || "N/A",
+        source: record.source || "USAspending",
       });
     });
 
@@ -220,23 +240,40 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
 
   return (
     <Card className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-bold text-foreground">
-            Funding Records
-          </h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Each row represents a unique grant. Organizations may appear multiple times if they received multiple grants.
-          </p>
+      <div className="mb-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-foreground">
+              Funding Records
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {showUniqueOrgs 
+                ? "Showing one record per organization (highest funding amount)."
+                : "Each row represents a unique grant. Organizations may appear multiple times if they received multiple grants."}
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="unique-orgs"
+                checked={showUniqueOrgs}
+                onCheckedChange={setShowUniqueOrgs}
+              />
+              <Label htmlFor="unique-orgs" className="text-sm cursor-pointer flex items-center gap-1">
+                <Users className="h-4 w-4" />
+                Unique Orgs Only
+              </Label>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button onClick={handleFindSubAwards} size="sm" className="gap-2">
             <Search className="h-4 w-4" />
             Find Sub-Awards for these Results
           </Button>
           <PushToClayButton
             dataType="funding_records"
-            records={sortedRecords.map(record => ({
+            records={displayRecords.map(record => ({
               id: record.id,
               organization_name: record.organizations.name,
               organization_id: record.organization_id,
@@ -245,7 +282,7 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
               grant_type: record.grant_types?.name || null,
               amount: Number(record.amount),
               status: record.status,
-              last_updated: record.organizations.last_updated || null,
+              award_date: record.action_date || record.date_range_start || null,
               source: record.source || "USAspending",
             }))}
           />
@@ -313,10 +350,10 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleSort("lastUpdated")}
+                  onClick={() => handleSort("awardDate")}
                   className="flex items-center gap-1 hover:bg-transparent"
                 >
-                  Last Updated
+                  Award Date
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
@@ -335,8 +372,8 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedRecords && sortedRecords.length > 0 ? (
-              sortedRecords.map((record) => {
+            {displayRecords && displayRecords.length > 0 ? (
+              displayRecords.map((record) => {
                 const assignment = assignmentMap.get(record.organization_id);
                 return (
                   <TableRow key={record.id}>
@@ -369,7 +406,7 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {record.organizations.last_updated || "N/A"}
+                      {record.action_date || record.date_range_start || "N/A"}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
