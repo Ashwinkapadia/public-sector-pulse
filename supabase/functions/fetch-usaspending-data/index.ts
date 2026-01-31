@@ -12,6 +12,18 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+function normalizeDateToYmd(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const s = input.trim();
+  if (!s) return null;
+  // USAspending dates are generally YYYY-MM-DD, but can include time.
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split("T")[0];
+  // Fallback: attempt parse and convert to YYYY-MM-DD.
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().split("T")[0];
+  return null;
+}
+
 // Helper function to format currency
 const formatAmount = (amount: number) => {
   return new Intl.NumberFormat("en-US", {
@@ -546,9 +558,10 @@ async function processData(
          const recipientName = result["Recipient Name"];
          const awardAmount = parseFloat(result["Award Amount"]) || 0;
          const awardingAgency = result["Awarding Agency"] || "Unknown";
-         const startDateStr = result["Start Date"];
-         const endDateStr = result["End Date"];
-         const actionDateStr = result["Action Date"] || startDateStr; // Use Action Date for when grant was awarded
+         const startDateStr = normalizeDateToYmd(result["Start Date"]);
+         const endDateStr = normalizeDateToYmd(result["End Date"]);
+         // Per your decision: use USAspending "Action Date" as the dashboard filter driver.
+         const actionDateStr = normalizeDateToYmd(result["Action Date"]) || startDateStr;
          const cfdaNumber = result["CFDA Number"];
          const cfdaTitle = result["CFDA Title"];
 
@@ -698,7 +711,7 @@ async function processData(
         const notesWithAwardIds = `From USAspending.gov - ${awardingAgency}, internal_id:${internalId || ''}, award_id:${awardId || ''}`;
 
         // Insert funding record with last_updated timestamp and action_date
-        const { error: fundingError } = await supabaseClient
+         const { error: fundingError } = await supabaseClient
           .from("funding_records")
           .insert({
             organization_id: organizationId,
@@ -706,9 +719,10 @@ async function processData(
             amount: awardAmount,
             status: "Active",
             fiscal_year: fiscalYear,
-            date_range_start: startDateStr || null,
-            date_range_end: endDateStr || null,
-            action_date: actionDateStr || null,
+             // Persist canonical YYYY-MM-DD strings for consistent filtering.
+             date_range_start: startDateStr,
+             date_range_end: endDateStr,
+             action_date: actionDateStr,
             cfda_code: cfdaNumber || null,
             grant_type_id: grantTypeId,
             notes: notesWithAwardIds,

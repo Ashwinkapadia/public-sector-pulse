@@ -11,6 +11,49 @@ interface NASBORequestBody {
   endDate?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function clearNasboForState(supabaseClient: any, state: string) {
+  const { data: orgs, error: orgErr } = await supabaseClient
+    .from("organizations")
+    .select("id")
+    .eq("state", state);
+
+  if (orgErr) {
+    console.error("Failed to load organizations for NASBO clear:", orgErr);
+    return;
+  }
+
+  const orgIds = (orgs || []).map((o: any) => o.id);
+  if (orgIds.length === 0) return;
+
+  const { data: fundingToClear, error: fundingSelectError } = await supabaseClient
+    .from("funding_records")
+    .select("id")
+    .eq("source", "NASBO")
+    .in("organization_id", orgIds);
+
+  if (fundingSelectError) {
+    console.error("Error selecting NASBO funding records to clear:", fundingSelectError);
+    return;
+  }
+
+  const fundingIds = (fundingToClear || []).map((r: any) => r.id);
+  if (fundingIds.length === 0) return;
+
+  // NASBO creates synthetic subawards; delete those first.
+  const { error: subErr } = await supabaseClient
+    .from("subawards")
+    .delete()
+    .in("funding_record_id", fundingIds);
+  if (subErr) console.error("Error deleting NASBO subawards:", subErr);
+
+  const { error: fundErr } = await supabaseClient
+    .from("funding_records")
+    .delete()
+    .in("id", fundingIds);
+  if (fundErr) console.error("Error deleting NASBO funding records:", fundErr);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -72,6 +115,9 @@ Deno.serve(async (req) => {
     const { state, startDate, endDate } = await req.json() as NASBORequestBody;
     
     console.log('Fetching NASBO data for:', { state, startDate, endDate });
+
+    // CRITICAL: ensure each search cycle starts clean for this source/state.
+    await clearNasboForState(supabase, state || 'CA');
 
     // Note: NASBO publishes reports as PDFs/Excel files, not via API
     // This is a placeholder that simulates fetching NASBO fiscal data
