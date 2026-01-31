@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -237,7 +237,7 @@ const Index = () => {
     }
   };
 
-  const handleFetchComplete = () => {
+  const handleFetchComplete = useCallback(() => {
     // Reset fetch session to hide progress
     setFetchSessionId(null);
     setFetching(false);
@@ -251,7 +251,7 @@ const Index = () => {
       title: "Prime Awards Fetch Complete",
       description: "Dashboard updated with new prime award data",
     });
-  };
+  }, [queryClient, toast]);
 
   const handleFetchSubawardsData = async () => {
     if (isAdmin === false) {
@@ -303,7 +303,7 @@ const Index = () => {
     }
   };
 
-  const handleSubawardsFetchComplete = () => {
+  const handleSubawardsFetchComplete = useCallback(() => {
     setSubawardsFetchSessionId(null);
     setFetchingSubawards(false);
     
@@ -313,7 +313,7 @@ const Index = () => {
       title: "Subawards Fetch Complete",
       description: "Subawards data updated",
     });
-  };
+  }, [queryClient, toast]);
 
   const handleFetchNASBOData = async () => {
     if (isAdmin === false) {

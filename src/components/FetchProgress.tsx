@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -27,9 +27,24 @@ interface FetchProgressProps {
 export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
   const [progress, setProgress] = useState<FetchProgressData | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+  
+  // Use ref to avoid re-subscribing when onComplete changes
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+  
+  // Track if we've already called onComplete to prevent double-calls
+  const hasCalledComplete = useRef(false);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      // Reset state when sessionId is cleared
+      setProgress(null);
+      setLogs([]);
+      hasCalledComplete.current = false;
+      return;
+    }
+
+    hasCalledComplete.current = false;
 
     // Initial fetch
     const fetchProgress = async () => {
@@ -43,6 +58,12 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
         setProgress(data);
         if (data.message) {
           setLogs((prev) => [...prev, `[${new Date(data.updated_at).toLocaleTimeString()}] ${data.message}`]);
+        }
+        
+        // Check if already completed (in case we missed the realtime event)
+        if ((data.status === "completed" || data.status === "failed") && !hasCalledComplete.current) {
+          hasCalledComplete.current = true;
+          onCompleteRef.current?.();
         }
       }
     };
@@ -71,8 +92,9 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
             ]);
           }
 
-          if (newData.status === "completed" || newData.status === "failed") {
-            onComplete?.();
+          if ((newData.status === "completed" || newData.status === "failed") && !hasCalledComplete.current) {
+            hasCalledComplete.current = true;
+            onCompleteRef.current?.();
           }
         }
       )
@@ -81,7 +103,7 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sessionId, onComplete]);
+  }, [sessionId]); // Only re-subscribe when sessionId changes, not onComplete
 
   if (!sessionId || !progress) return null;
 
