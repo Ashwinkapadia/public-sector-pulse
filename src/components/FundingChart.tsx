@@ -14,10 +14,12 @@ import { useMemo } from "react";
 
 interface FundingChartProps {
   state?: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
-export function FundingChart({ state }: FundingChartProps) {
-  const { data: fundingRecords, isLoading: loadingRecords } = useFundingRecords(state);
+export function FundingChart({ state, startDate, endDate }: FundingChartProps) {
+  const { data: fundingRecords, isLoading: loadingRecords } = useFundingRecords(state, startDate, endDate);
   const { data: verticals, isLoading: loadingVerticals } = useVerticals();
 
   const chartData = useMemo(() => {

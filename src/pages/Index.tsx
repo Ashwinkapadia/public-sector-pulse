@@ -814,7 +814,7 @@ const Index = () => {
 
         {/* Funding Chart */}
         <section className="mb-8">
-          <FundingChart state={selectedState} />
+          <FundingChart state={selectedState} startDate={startDate} endDate={endDate} />
         </section>
 
         {/* Prime Awards Table */}
