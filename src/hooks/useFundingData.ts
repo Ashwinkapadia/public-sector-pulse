@@ -85,10 +85,11 @@ export function useVerticals() {
 export function useFundingRecords(
   state?: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  verticalIds?: string[]
 ) {
   return useQuery({
-    queryKey: ["funding_records", state, toDateKey(startDate), toDateKey(endDate)],
+    queryKey: ["funding_records", state, toDateKey(startDate), toDateKey(endDate), verticalIds?.join(",") || ""],
     queryFn: async () => {
       // First get organization IDs for the selected state
       let orgIds: string[] | undefined;
@@ -138,6 +139,11 @@ export function useFundingRecords(
       // This handles both USAspending (has action_date) and Grants.gov/legacy records.
       const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
       if (dateOrFilter) query = query.or(dateOrFilter);
+
+      // Filter by verticals (server-side) when specified
+      if (verticalIds && verticalIds.length > 0) {
+        query = query.in("vertical_id", verticalIds);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
