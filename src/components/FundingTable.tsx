@@ -26,14 +26,13 @@ interface FundingTableProps {
   verticalIds?: string[];
   startDate?: Date;
   endDate?: Date;
-  strictActionDateOnly?: boolean;
 }
 
 type SortField = "organization" | "vertical" | "funding" | "status" | "awardDate" | "source";
 type SortOrder = "asc" | "desc";
 
-export function FundingTable({ state, verticalIds, startDate, endDate, strictActionDateOnly }: FundingTableProps) {
-  const { data: fundingRecords, isLoading } = useFundingRecords(state, startDate, endDate, strictActionDateOnly);
+export function FundingTable({ state, verticalIds, startDate, endDate }: FundingTableProps) {
+  const { data: fundingRecords, isLoading } = useFundingRecords(state, startDate, endDate);
   const { data: assignments } = useRepAssignments();
   const [sortField, setSortField] = useState<SortField>("funding");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
