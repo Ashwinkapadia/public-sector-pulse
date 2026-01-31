@@ -13,6 +13,32 @@ interface RequestBody {
   endDate?: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function clearGrantsGovForState(supabaseClient: any, state: string) {
+  // Grants.gov opportunities are stored as funding_records with source='Grants.gov'
+  // and organizations created with the selected state.
+  const { data: orgs, error: orgErr } = await supabaseClient
+    .from("organizations")
+    .select("id")
+    .eq("state", state);
+
+  if (orgErr) {
+    console.error("Failed to load organizations for clear:", orgErr);
+    return;
+  }
+
+  const orgIds = (orgs || []).map((o: any) => o.id);
+  if (orgIds.length === 0) return;
+
+  const { error: deleteErr } = await supabaseClient
+    .from("funding_records")
+    .delete()
+    .eq("source", "Grants.gov")
+    .in("organization_id", orgIds);
+
+  if (deleteErr) console.error("Failed to clear existing Grants.gov records:", deleteErr);
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -82,6 +108,9 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    // CRITICAL: ensure each search cycle starts clean for this source/state.
+    await clearGrantsGovForState(supabaseClient, state);
 
     // Fetch data from Grants.gov API using POST as documented for search2
     const requestBody: Record<string, unknown> = {
@@ -232,6 +261,15 @@ serve(async (req) => {
         
         const postedDate = parseGrantsGovDate(rawOpenDate);
         const closeDate = parseGrantsGovDate(rawCloseDate);
+
+        // Apply requested date range to the *posting date* (openDate/postDate).
+        // This prevents inserting out-of-range opportunities that will later look like “old records”.
+        const startBound = parseGrantsGovDate(startDate);
+        const endBound = parseGrantsGovDate(endDate);
+        if (postedDate) {
+          if (startBound && postedDate < startBound) continue;
+          if (endBound && postedDate > endBound) continue;
+        }
         const fiscalYear = postedDate ? new Date(postedDate).getFullYear() : new Date().getFullYear();
         
         // Get CFDA/ALN number
