@@ -117,7 +117,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 3. Delete organizations
+    // 3. Delete rep assignments (depends on organizations)
+    const { error: assignmentsError, count: assignmentsCount } = await serviceClient
+      .from('rep_assignments')
+      .delete({ count: 'exact' })
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (assignmentsError) {
+      console.error('Failed to delete rep assignments:', assignmentsError);
+      return new Response(
+        JSON.stringify({ error: 'Deletion failed', message: 'Failed to delete rep assignments', details: assignmentsError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 4. Delete organizations
     const { error: orgError, count: orgCount } = await serviceClient
       .from('organizations')
       .delete({ count: 'exact' })
@@ -131,7 +145,58 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Bulk delete completed by user ${userId}: ${subawardsCount} subawards, ${fundingCount} funding records, ${orgCount} organizations`);
+    // 5. Delete fetch progress rows (operational/logging data)
+    const { error: progressError, count: progressCount } = await serviceClient
+      .from('fetch_progress')
+      .delete({ count: 'exact' })
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (progressError) {
+      console.error('Failed to delete fetch progress:', progressError);
+      return new Response(
+        JSON.stringify({ error: 'Deletion failed', message: 'Failed to delete fetch progress', details: progressError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 6. Delete saved searches
+    const { error: savedSearchesError, count: savedSearchesCount } = await serviceClient
+      .from('saved_searches')
+      .delete({ count: 'exact' })
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (savedSearchesError) {
+      console.error('Failed to delete saved searches:', savedSearchesError);
+      return new Response(
+        JSON.stringify({ error: 'Deletion failed', message: 'Failed to delete saved searches', details: savedSearchesError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 7. Delete saved subaward searches
+    const { error: savedSubawardSearchesError, count: savedSubawardSearchesCount } = await serviceClient
+      .from('saved_subaward_searches')
+      .delete({ count: 'exact' })
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (savedSubawardSearchesError) {
+      console.error('Failed to delete saved subaward searches:', savedSubawardSearchesError);
+      return new Response(
+        JSON.stringify({ error: 'Deletion failed', message: 'Failed to delete saved subaward searches', details: savedSubawardSearchesError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(
+      `Bulk delete completed by user ${userId}: ` +
+      `${subawardsCount} subawards, ` +
+      `${fundingCount} funding records, ` +
+      `${assignmentsCount} rep assignments, ` +
+      `${orgCount} organizations, ` +
+      `${progressCount} fetch progress rows, ` +
+      `${savedSearchesCount} saved searches, ` +
+      `${savedSubawardSearchesCount} saved subaward searches`
+    );
 
     return new Response(
       JSON.stringify({ 
@@ -139,7 +204,11 @@ Deno.serve(async (req) => {
         deleted: {
           subawards: subawardsCount || 0,
           funding_records: fundingCount || 0,
-          organizations: orgCount || 0
+          rep_assignments: assignmentsCount || 0,
+          organizations: orgCount || 0,
+          fetch_progress: progressCount || 0,
+          saved_searches: savedSearchesCount || 0,
+          saved_subaward_searches: savedSubawardSearchesCount || 0
         }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
