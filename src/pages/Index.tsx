@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +41,9 @@ const Index = () => {
   const { data: savedSearches } = useSavedSearches();
   const saveSearchMutation = useSaveSearch();
   const deleteSearchMutation = useDeleteSearch();
+
+  // Prevent spammy refetches while the user is clicking around in the date pickers.
+  const filterRefetchTimeout = useRef<number | null>(null);
 
   const getSessionWithTimeout = async (timeoutMs = 8000) => {
     let timeoutId: number | undefined;
@@ -147,6 +150,35 @@ const Index = () => {
       subscription.unsubscribe();
     };
   }, [navigate]);
+
+  // Ensure UI never gets stuck showing stale data when filters change.
+  // (In theory, queryKey changes should be enough, but we've seen cases where
+  // the screen keeps showing old results; this makes it deterministic.)
+  useEffect(() => {
+    if (loading) return;
+
+    if (filterRefetchTimeout.current) {
+      window.clearTimeout(filterRefetchTimeout.current);
+    }
+
+    filterRefetchTimeout.current = window.setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
+      queryClient
+        .refetchQueries({ queryKey: ["funding_records"], exact: false, type: "all" })
+        .catch(() => {});
+      queryClient
+        .refetchQueries({ queryKey: ["funding_metrics"], exact: false, type: "all" })
+        .catch(() => {});
+    }, 150);
+
+    return () => {
+      if (filterRefetchTimeout.current) {
+        window.clearTimeout(filterRefetchTimeout.current);
+        filterRefetchTimeout.current = null;
+      }
+    };
+  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals]);
 
   const invokeWithAuth = async <T = any>(
     functionName: string,
@@ -729,6 +761,15 @@ const Index = () => {
                 onEndDateChange={setEndDate}
               />
             </div>
+
+            {/* Debug: show what the UI thinks the filters are */}
+            <div className="mt-4 text-xs text-muted-foreground">
+              Active filters: state={selectedState || "(none)"} • start=
+              {startDate ? startDate.toISOString().slice(0, 10) : "(none)"} • end=
+              {endDate ? endDate.toISOString().slice(0, 10) : "(none)"} • verticals=
+              {selectedVerticals.length}
+            </div>
+
             <div className="mt-6">
               <VerticalsFilter
                 selectedVerticals={selectedVerticals}
