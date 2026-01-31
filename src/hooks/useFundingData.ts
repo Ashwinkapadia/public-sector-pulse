@@ -81,9 +81,14 @@ export function useVerticals() {
   });
 }
 
-export function useFundingRecords(state?: string, startDate?: Date, endDate?: Date) {
+export function useFundingRecords(
+  state?: string,
+  startDate?: Date,
+  endDate?: Date,
+  strictActionDateOnly?: boolean
+) {
   return useQuery({
-    queryKey: ["funding_records", state, toDateKey(startDate), toDateKey(endDate)],
+    queryKey: ["funding_records", state, toDateKey(startDate), toDateKey(endDate), strictActionDateOnly ?? false],
     queryFn: async () => {
       // First get organization IDs for the selected state
       let orgIds: string[] | undefined;
@@ -131,7 +136,11 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
       // Filter by action_date (when grant was awarded)
       // IMPORTANT: build a single OR filter string so we don't override conditions.
       // This handles both USAspending (has action_date) and Grants.gov/legacy records.
-      const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
+      const dateOrFilter = buildAwardDateOrFilter({
+        start: startDate,
+        end: endDate,
+        strictActionDateOnly,
+      });
       if (dateOrFilter) query = query.or(dateOrFilter);
 
       const { data, error } = await query;
@@ -141,7 +150,13 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
   });
 }
 
-export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Date, verticalIds?: string[]) {
+export function useFundingMetrics(
+  state?: string,
+  startDate?: Date,
+  endDate?: Date,
+  verticalIds?: string[],
+  strictActionDateOnly?: boolean
+) {
   return useQuery({
     queryKey: [
       "funding_metrics",
@@ -150,6 +165,7 @@ export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Da
       toDateKey(endDate),
       // keep verticalIds stable for hashing
       verticalIds?.join(",") || "",
+      strictActionDateOnly ?? false,
     ],
     queryFn: async () => {
       // First get organization IDs for the selected state
@@ -182,7 +198,11 @@ export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Da
       }
 
       // Filter by action_date (when grant was awarded) with fallback to date_range_start
-      const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
+      const dateOrFilter = buildAwardDateOrFilter({
+        start: startDate,
+        end: endDate,
+        strictActionDateOnly,
+      });
       if (dateOrFilter) fundingQuery = fundingQuery.or(dateOrFilter);
 
       // Filter by verticals if specified
@@ -197,7 +217,8 @@ export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Da
         startDate: startDate?.toISOString(),
         endDate: endDate?.toISOString(),
         orgIdsCount: orgIds?.length,
-        fundingRecordsCount: fundingData?.length
+        fundingRecordsCount: fundingData?.length,
+        strictActionDateOnly,
       });
 
       // Count unique organizations that have funding records in the date range

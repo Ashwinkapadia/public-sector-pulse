@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { StateSelector } from "@/components/StateSelector";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { LogOut, RefreshCw, Trash2, Save, FileText, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DateRangeSlider } from "@/components/DateRangeSlider";
@@ -25,6 +27,7 @@ const Index = () => {
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [selectedVerticals, setSelectedVerticals] = useState<string[]>([]);
+  const [strictActionDateOnly, setStrictActionDateOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -169,7 +172,7 @@ const Index = () => {
     }, 200);
 
     return () => window.clearTimeout(t);
-  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals]);
+  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals, strictActionDateOnly]);
 
   const invokeWithAuth = async <T = any>(
     functionName: string,
@@ -753,12 +756,24 @@ const Index = () => {
               />
             </div>
 
+            {/* Strict action_date toggle */}
+            <div className="mt-4 flex items-center gap-3">
+              <Switch
+                id="strict-action-date"
+                checked={strictActionDateOnly}
+                onCheckedChange={setStrictActionDateOnly}
+              />
+              <Label htmlFor="strict-action-date" className="text-sm cursor-pointer">
+                Strict action_date only (exclude records without award date)
+              </Label>
+            </div>
+
             {/* Debug: show what the UI thinks the filters are */}
             <div className="mt-4 text-xs text-muted-foreground">
               Active filters: state={selectedState || "(none)"} • start=
               {startDate ? startDate.toISOString().slice(0, 10) : "(none)"} • end=
               {endDate ? endDate.toISOString().slice(0, 10) : "(none)"} • verticals=
-              {selectedVerticals.length}
+              {selectedVerticals.length} • strict={strictActionDateOnly ? "yes" : "no"}
             </div>
 
             <div className="mt-6">
@@ -841,18 +856,18 @@ const Index = () => {
 
         {/* Metrics Overview */}
         <section className="mb-8">
-          <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} />
+          <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} strictActionDateOnly={strictActionDateOnly} />
         </section>
 
         {/* Funding Chart */}
         <section className="mb-8">
-          <FundingChart state={selectedState} startDate={startDate} endDate={endDate} />
+          <FundingChart state={selectedState} startDate={startDate} endDate={endDate} strictActionDateOnly={strictActionDateOnly} />
         </section>
 
         {/* Prime Awards Table */}
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-foreground mb-4">Prime Awards</h2>
-          <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} />
+          <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} strictActionDateOnly={strictActionDateOnly} />
         </section>
 
         {/* Subawards Table */}
