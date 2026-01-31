@@ -46,13 +46,18 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
 
     hasCalledComplete.current = false;
 
-    // Initial fetch
-    const fetchProgress = async () => {
-      const { data } = await supabase
+    // Fetch progress once. Returns the latest row when available.
+    const fetchProgressOnce = async () => {
+      const { data, error } = await supabase
         .from("fetch_progress")
         .select("*")
         .eq("session_id", sessionId)
         .single();
+
+      if (error) {
+        // Avoid noisy UI errors; this can happen briefly if the row isn't created yet.
+        return null;
+      }
 
       if (data) {
         setProgress(data);
@@ -66,9 +71,32 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
           onCompleteRef.current?.();
         }
       }
+
+      return data as FetchProgressData;
     };
 
-    fetchProgress();
+    // Always do an initial fetch so the progress UI appears immediately.
+    fetchProgressOnce();
+
+    // Polling fallback: Realtime can be unavailable/misconfigured in some environments.
+    // Poll until completed/failed so auto-refresh is reliable.
+    const pollIntervalMs = 2000;
+    const maxPollMs = 10 * 60 * 1000; // 10 minutes safety stop
+    const startedAt = Date.now();
+
+    const intervalId = window.setInterval(async () => {
+      if (hasCalledComplete.current) return;
+      if (Date.now() - startedAt > maxPollMs) {
+        window.clearInterval(intervalId);
+        return;
+      }
+
+      const latest = await fetchProgressOnce();
+      if (!latest) return;
+      if (latest.status === "completed" || latest.status === "failed") {
+        window.clearInterval(intervalId);
+      }
+    }, pollIntervalMs);
 
     // Subscribe to realtime updates
     const channel = supabase
@@ -101,6 +129,7 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
       .subscribe();
 
     return () => {
+      window.clearInterval(intervalId);
       supabase.removeChannel(channel);
     };
   }, [sessionId]); // Only re-subscribe when sessionId changes, not onComplete
