@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,8 +42,6 @@ const Index = () => {
   const saveSearchMutation = useSaveSearch();
   const deleteSearchMutation = useDeleteSearch();
 
-  // Prevent spammy refetches while the user is clicking around in the date pickers.
-  const filterRefetchTimeout = useRef<number | null>(null);
 
   const getSessionWithTimeout = async (timeoutMs = 8000) => {
     let timeoutId: number | undefined;
@@ -151,33 +149,22 @@ const Index = () => {
     };
   }, [navigate]);
 
-  // Ensure UI never gets stuck showing stale data when filters change.
-  // (In theory, queryKey changes should be enough, but we've seen cases where
-  // the screen keeps showing old results; this makes it deterministic.)
+  // Cancel stale queries when filters change so we only show results for
+  // the current filter set. The hooks themselves will trigger fresh fetches
+  // because their queryKeys include the filter values.
   useEffect(() => {
     if (loading) return;
 
-    if (filterRefetchTimeout.current) {
-      window.clearTimeout(filterRefetchTimeout.current);
-    }
+    // Cancel any in-flight queries for funding_records / funding_metrics
+    // that don't match the current filter signature. This prevents stale
+    // results from old filter combos racing with new ones.
+    queryClient.cancelQueries({ queryKey: ["funding_records"] });
+    queryClient.cancelQueries({ queryKey: ["funding_metrics"] });
 
-    filterRefetchTimeout.current = window.setTimeout(() => {
-      queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
-      queryClient
-        .refetchQueries({ queryKey: ["funding_records"], exact: false, type: "all" })
-        .catch(() => {});
-      queryClient
-        .refetchQueries({ queryKey: ["funding_metrics"], exact: false, type: "all" })
-        .catch(() => {});
-    }, 150);
-
-    return () => {
-      if (filterRefetchTimeout.current) {
-        window.clearTimeout(filterRefetchTimeout.current);
-        filterRefetchTimeout.current = null;
-      }
-    };
+    // Remove all cached data for these query prefixes so React Query
+    // fetches fresh when the hooks run with the new filter values.
+    queryClient.removeQueries({ queryKey: ["funding_records"], exact: false });
+    queryClient.removeQueries({ queryKey: ["funding_metrics"], exact: false });
   }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals]);
 
   const invokeWithAuth = async <T = any>(
