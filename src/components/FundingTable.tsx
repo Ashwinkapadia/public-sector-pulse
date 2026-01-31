@@ -32,7 +32,8 @@ type SortField = "organization" | "vertical" | "funding" | "status" | "awardDate
 type SortOrder = "asc" | "desc";
 
 export function FundingTable({ state, verticalIds, startDate, endDate }: FundingTableProps) {
-  const { data: fundingRecords, isLoading } = useFundingRecords(state, startDate, endDate);
+  // Now passes verticalIds to the hook so filtering happens server-side
+  const { data: fundingRecords, isLoading } = useFundingRecords(state, startDate, endDate, verticalIds);
   const { data: assignments } = useRepAssignments();
   const [sortField, setSortField] = useState<SortField>("funding");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -45,13 +46,6 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
     return new Map(assignments.map(a => [a.organization_id, a]));
   }, [assignments]);
 
-  // Filter by verticals
-  const filteredByVerticals = useMemo(() => {
-    if (!fundingRecords) return [];
-    if (!verticalIds || verticalIds.length === 0) return fundingRecords;
-    return fundingRecords.filter(record => verticalIds.includes(record.vertical_id));
-  }, [fundingRecords, verticalIds]);
-
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -62,9 +56,9 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
   };
 
   const sortedRecords = useMemo(() => {
-    if (!filteredByVerticals) return [];
+    if (!fundingRecords) return [];
     
-    const sorted = [...filteredByVerticals].sort((a, b) => {
+    const sorted = [...fundingRecords].sort((a, b) => {
       let aVal: any;
       let bVal: any;
 
@@ -103,7 +97,7 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
     });
 
     return sorted;
-  }, [filteredByVerticals, sortField, sortOrder]);
+  }, [fundingRecords, sortField, sortOrder]);
 
   // Deduplicate to show only one record per organization (highest funding)
   const displayRecords = useMemo(() => {

@@ -16,19 +16,27 @@ interface FundingChartProps {
   state?: string;
   startDate?: Date;
   endDate?: Date;
+  verticalIds?: string[];
 }
 
-export function FundingChart({ state, startDate, endDate }: FundingChartProps) {
-  const { data: fundingRecords, isLoading: loadingRecords } = useFundingRecords(state, startDate, endDate);
+export function FundingChart({ state, startDate, endDate, verticalIds }: FundingChartProps) {
+  // Now passes verticalIds so the chart only fetches data for selected verticals
+  const { data: fundingRecords, isLoading: loadingRecords } = useFundingRecords(state, startDate, endDate, verticalIds);
   const { data: verticals, isLoading: loadingVerticals } = useVerticals();
 
   const chartData = useMemo(() => {
     if (!fundingRecords || !verticals) return [];
 
-    // Initialize map with all verticals
+    // Determine which verticals to show categories for
+    const selectedVerticalSet = new Set(verticalIds || []);
+    const verticalsToShow = verticalIds && verticalIds.length > 0
+      ? verticals.filter(v => selectedVerticalSet.has(v.id))
+      : verticals;
+
+    // Initialize map only with the verticals we want to display
     const verticalMap = new Map<string, { funding: number; organizations: Set<string> }>();
     
-    verticals.forEach((vertical) => {
+    verticalsToShow.forEach((vertical) => {
       verticalMap.set(vertical.name, { funding: 0, organizations: new Set() });
     });
 
@@ -47,7 +55,7 @@ export function FundingChart({ state, startDate, endDate }: FundingChartProps) {
       funding: Math.round(data.funding),
       organizations: data.organizations.size,
     }));
-  }, [fundingRecords, verticals]);
+  }, [fundingRecords, verticals, verticalIds]);
 
   if (loadingRecords || loadingVerticals) {
     return (
