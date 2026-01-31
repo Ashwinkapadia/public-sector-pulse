@@ -65,27 +65,41 @@ const Index = () => {
   };
 
   useEffect(() => {
-    // Check if user is authenticated
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    let isMounted = true;
+
+    // Set up auth state listener FIRST (recommended by Supabase)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      
       if (!session) {
+        setIsAdmin(null);
+        setLoading(false);
         navigate("/auth");
         return;
       }
+      
       await refreshAdminStatus();
       setLoading(false);
     });
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Then check current session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted) return;
+      
       if (!session) {
-        setIsAdmin(null);
+        setLoading(false);
         navigate("/auth");
         return;
       }
+      
       await refreshAdminStatus();
+      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const invokeWithAuth = async <T = any>(
