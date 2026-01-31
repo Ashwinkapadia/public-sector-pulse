@@ -254,31 +254,52 @@ const Index = () => {
     }
   };
 
-  const handleFetchComplete = useCallback(() => {
+  const handleFetchComplete = useCallback(async () => {
     // Reset fetch session to hide progress
     setFetchSessionId(null);
     setFetching(false);
+
+    console.debug("handleFetchComplete: start", {
+      selectedState,
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+      selectedVerticalsCount: selectedVerticals.length,
+    });
     
     // Invalidate all queries to refresh data
-    queryClient.invalidateQueries({ queryKey: ["organizations"] });
-    queryClient.invalidateQueries({ queryKey: ["funding_records"] });
-    queryClient.invalidateQueries({ queryKey: ["funding_metrics"] });
+    // NOTE: useFundingRecords/useFundingMetrics include params in their query keys;
+    // refetching with exact:false ensures we match all variants.
+    queryClient.invalidateQueries({ queryKey: ["organizations"], exact: false });
+    queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
+    queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
 
-    // Ensure active queries refetch immediately (invalidate alone can be too lazy depending on config)
-    queryClient.refetchQueries({ queryKey: ["funding_records"], type: "active" });
-    queryClient.refetchQueries({ queryKey: ["funding_metrics"], type: "active" });
+    // Ensure queries refetch immediately. Use type:"all" so we don't miss cases where the
+    // query is considered inactive at the moment the completion event arrives.
+    try {
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["funding_records"], exact: false, type: "all" }),
+        queryClient.refetchQueries({ queryKey: ["funding_metrics"], exact: false, type: "all" }),
+      ]);
+      console.debug("handleFetchComplete: initial refetch done");
+    } catch (err) {
+      console.warn("handleFetchComplete: initial refetch failed", err);
+    }
 
     // Defensive: ingestion completion/status write can race the final inserts; refetch once more shortly after
     window.setTimeout(() => {
-      queryClient.refetchQueries({ queryKey: ["funding_records"], type: "active" });
-      queryClient.refetchQueries({ queryKey: ["funding_metrics"], type: "active" });
+      Promise.all([
+        queryClient.refetchQueries({ queryKey: ["funding_records"], exact: false, type: "all" }),
+        queryClient.refetchQueries({ queryKey: ["funding_metrics"], exact: false, type: "all" }),
+      ])
+        .then(() => console.debug("handleFetchComplete: delayed refetch done"))
+        .catch((err) => console.warn("handleFetchComplete: delayed refetch failed", err));
     }, 1500);
     
     toast({
       title: "Prime Awards Fetch Complete",
       description: "Dashboard updated with new prime award data",
     });
-  }, [queryClient, toast]);
+  }, [queryClient, toast, selectedState, startDate, endDate, selectedVerticals.length]);
 
   const handleFetchSubawardsData = async () => {
     if (isAdmin === false) {
