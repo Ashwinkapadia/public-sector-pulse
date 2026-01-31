@@ -2,6 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { buildAwardDateOrFilter } from "@/hooks/funding/dateRangeFilter";
 
+function toDateKey(d?: Date) {
+  // Use a stable YYYY-MM-DD key (avoid Date objects in query keys).
+  // This ensures TanStack Query reliably treats date changes as distinct queries.
+  return d ? d.toISOString().slice(0, 10) : undefined;
+}
+
 interface Organization {
   id: string;
   name: string;
@@ -77,7 +83,7 @@ export function useVerticals() {
 
 export function useFundingRecords(state?: string, startDate?: Date, endDate?: Date) {
   return useQuery({
-    queryKey: ["funding_records", state, startDate, endDate],
+    queryKey: ["funding_records", state, toDateKey(startDate), toDateKey(endDate)],
     queryFn: async () => {
       // First get organization IDs for the selected state
       let orgIds: string[] | undefined;
@@ -137,7 +143,14 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
 
 export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Date, verticalIds?: string[]) {
   return useQuery({
-    queryKey: ["funding_metrics", state, startDate, endDate, verticalIds],
+    queryKey: [
+      "funding_metrics",
+      state,
+      toDateKey(startDate),
+      toDateKey(endDate),
+      // keep verticalIds stable for hashing
+      verticalIds?.join(",") || "",
+    ],
     queryFn: async () => {
       // First get organization IDs for the selected state
       let orgIds: string[] | undefined;
