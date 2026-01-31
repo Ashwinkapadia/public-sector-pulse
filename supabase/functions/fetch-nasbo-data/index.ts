@@ -192,6 +192,9 @@ Deno.serve(async (req) => {
             notes: item.description,
             source: 'NASBO',
             grant_type_id: grantTypeId,
+            // For consistent dashboard date filtering, treat the selected start date
+            // as the NASBO record's "action_date" (award/budget effective date).
+            action_date: startDate || '2024-01-01',
             date_range_start: startDate || '2024-01-01',
             date_range_end: endDate || '2024-12-31',
           })

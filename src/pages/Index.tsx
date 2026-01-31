@@ -4,8 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { StateSelector } from "@/components/StateSelector";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { LogOut, RefreshCw, Trash2, Save, FileText, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DateRangeSlider } from "@/components/DateRangeSlider";
@@ -21,13 +19,13 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { VerticalsFilter } from "@/components/VerticalsFilter";
 import { FetchProgress } from "@/components/FetchProgress";
+import { format } from "date-fns";
 
 const Index = () => {
   const [selectedState, setSelectedState] = useState<string>();
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [selectedVerticals, setSelectedVerticals] = useState<string[]>([]);
-  const [strictActionDateOnly, setStrictActionDateOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -172,7 +170,7 @@ const Index = () => {
     }, 200);
 
     return () => window.clearTimeout(t);
-  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals, strictActionDateOnly]);
+  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals]);
 
   const invokeWithAuth = async <T = any>(
     functionName: string,
@@ -256,8 +254,8 @@ const Index = () => {
     try {
       const { data, error } = await invokeWithAuth("fetch-usaspending-data", {
         state: selectedState,
-        startDate: startDate?.toISOString().split("T")[0],
-        endDate: endDate?.toISOString().split("T")[0],
+        startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+        endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
         sessionId,
       });
 
@@ -353,8 +351,8 @@ const Index = () => {
     try {
       const { data, error } = await invokeWithAuth("fetch-subawards-data", {
         state: selectedState,
-        startDate: startDate?.toISOString().split("T")[0],
-        endDate: endDate?.toISOString().split("T")[0],
+        startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+        endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
         sessionId,
       });
 
@@ -413,8 +411,8 @@ const Index = () => {
     try {
       const { data, error } = await invokeWithAuth("fetch-nasbo-data", {
         state: selectedState,
-        startDate: startDate?.toISOString().split("T")[0],
-        endDate: endDate?.toISOString().split("T")[0],
+        startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+        endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
       });
 
       if (error) throw error;
@@ -464,8 +462,8 @@ const Index = () => {
     try {
       const { data, error } = await invokeWithAuth("fetch-grants-data", {
         state: selectedState,
-        startDate: startDate?.toISOString().split("T")[0],
-        endDate: endDate?.toISOString().split("T")[0],
+        startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+        endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
       });
 
       if (error) throw error;
@@ -557,8 +555,8 @@ const Index = () => {
       await saveSearchMutation.mutateAsync({
         name: searchName,
         state: selectedState,
-        start_date: startDate?.toISOString().split("T")[0],
-        end_date: endDate?.toISOString().split("T")[0],
+        start_date: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+        end_date: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
         source: 'USAspending',
       });
 
@@ -756,24 +754,12 @@ const Index = () => {
               />
             </div>
 
-            {/* Strict action_date toggle */}
-            <div className="mt-4 flex items-center gap-3">
-              <Switch
-                id="strict-action-date"
-                checked={strictActionDateOnly}
-                onCheckedChange={setStrictActionDateOnly}
-              />
-              <Label htmlFor="strict-action-date" className="text-sm cursor-pointer">
-                Strict action_date only (exclude records without award date)
-              </Label>
-            </div>
-
             {/* Debug: show what the UI thinks the filters are */}
             <div className="mt-4 text-xs text-muted-foreground">
               Active filters: state={selectedState || "(none)"} • start=
-              {startDate ? startDate.toISOString().slice(0, 10) : "(none)"} • end=
-              {endDate ? endDate.toISOString().slice(0, 10) : "(none)"} • verticals=
-              {selectedVerticals.length} • strict={strictActionDateOnly ? "yes" : "no"}
+              {startDate ? format(startDate, "yyyy-MM-dd") : "(none)"} • end=
+              {endDate ? format(endDate, "yyyy-MM-dd") : "(none)"} • verticals=
+              {selectedVerticals.length}
             </div>
 
             <div className="mt-6">
@@ -856,18 +842,18 @@ const Index = () => {
 
         {/* Metrics Overview */}
         <section className="mb-8">
-          <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} strictActionDateOnly={strictActionDateOnly} />
+          <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} />
         </section>
 
         {/* Funding Chart */}
         <section className="mb-8">
-          <FundingChart state={selectedState} startDate={startDate} endDate={endDate} strictActionDateOnly={strictActionDateOnly} />
+          <FundingChart state={selectedState} startDate={startDate} endDate={endDate} />
         </section>
 
         {/* Prime Awards Table */}
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-foreground mb-4">Prime Awards</h2>
-          <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} strictActionDateOnly={strictActionDateOnly} />
+          <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} />
         </section>
 
         {/* Subawards Table */}

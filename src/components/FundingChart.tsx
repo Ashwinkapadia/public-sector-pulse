@@ -16,11 +16,10 @@ interface FundingChartProps {
   state?: string;
   startDate?: Date;
   endDate?: Date;
-  strictActionDateOnly?: boolean;
 }
 
-export function FundingChart({ state, startDate, endDate, strictActionDateOnly }: FundingChartProps) {
-  const { data: fundingRecords, isLoading: loadingRecords } = useFundingRecords(state, startDate, endDate, strictActionDateOnly);
+export function FundingChart({ state, startDate, endDate }: FundingChartProps) {
+  const { data: fundingRecords, isLoading: loadingRecords } = useFundingRecords(state, startDate, endDate);
   const { data: verticals, isLoading: loadingVerticals } = useVerticals();
 
   const chartData = useMemo(() => {
