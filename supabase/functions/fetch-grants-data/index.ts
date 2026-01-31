@@ -203,8 +203,35 @@ serve(async (req) => {
           console.error("Error fetching opportunity details:", detailError);
         }
         
-        // Parse date
-        const postedDate = opportunity.openDate || opportunity.postDate;
+        // Parse date - Grants.gov returns openDate as "MM/DD/YYYY" format
+        const rawOpenDate = opportunity.openDate || opportunity.postDate;
+        const rawCloseDate = opportunity.closeDate;
+        
+        // Convert MM/DD/YYYY to YYYY-MM-DD for PostgreSQL compatibility
+        const parseGrantsGovDate = (dateStr: string | null | undefined): string | null => {
+          if (!dateStr) return null;
+          // Handle MM/DD/YYYY format
+          const parts = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (parts) {
+            const [, month, day, year] = parts;
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+          // If already YYYY-MM-DD or ISO format, return as-is
+          if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+            return dateStr.split('T')[0];
+          }
+          // Try standard Date parsing as fallback
+          try {
+            const d = new Date(dateStr);
+            if (!isNaN(d.getTime())) {
+              return d.toISOString().split('T')[0];
+            }
+          } catch { /* ignore */ }
+          return null;
+        };
+        
+        const postedDate = parseGrantsGovDate(rawOpenDate);
+        const closeDate = parseGrantsGovDate(rawCloseDate);
         const fiscalYear = postedDate ? new Date(postedDate).getFullYear() : new Date().getFullYear();
         
         // Get CFDA/ALN number
@@ -334,9 +361,9 @@ serve(async (req) => {
             fiscal_year: fiscalYear,
             source: "Grants.gov",
             cfda_code: cfdaNumber,
-            action_date: postedDate || null, // Set action_date for consistent date filtering
-            date_range_start: postedDate || null,
-            date_range_end: opportunity.closeDate || null,
+            action_date: postedDate, // Use parsed openDate for consistent date filtering
+            date_range_start: postedDate,
+            date_range_end: closeDate,
             notes: `${oppTitle} (${oppNumber})`,
           })
           .select()
