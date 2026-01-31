@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { buildAwardDateOrFilter } from "@/hooks/funding/dateRangeFilter";
 
 interface Organization {
   id: string;
@@ -122,17 +123,10 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
       }
 
       // Filter by action_date (when grant was awarded)
-      // Use OR filter to include records where action_date is set OR fall back to date_range_start
-      // This handles both USAspending (has action_date) and Grants.gov/legacy records
-      if (startDate) {
-        const startStr = startDate.toISOString().split("T")[0];
-        query = query.or(`action_date.gte.${startStr},and(action_date.is.null,date_range_start.gte.${startStr})`);
-      }
-
-      if (endDate) {
-        const endStr = endDate.toISOString().split("T")[0];
-        query = query.or(`action_date.lte.${endStr},and(action_date.is.null,date_range_start.lte.${endStr})`);
-      }
+      // IMPORTANT: build a single OR filter string so we don't override conditions.
+      // This handles both USAspending (has action_date) and Grants.gov/legacy records.
+      const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
+      if (dateOrFilter) query = query.or(dateOrFilter);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -175,15 +169,8 @@ export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Da
       }
 
       // Filter by action_date (when grant was awarded) with fallback to date_range_start
-      if (startDate) {
-        const startStr = startDate.toISOString().split("T")[0];
-        fundingQuery = fundingQuery.or(`action_date.gte.${startStr},and(action_date.is.null,date_range_start.gte.${startStr})`);
-      }
-
-      if (endDate) {
-        const endStr = endDate.toISOString().split("T")[0];
-        fundingQuery = fundingQuery.or(`action_date.lte.${endStr},and(action_date.is.null,date_range_start.lte.${endStr})`);
-      }
+      const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
+      if (dateOrFilter) fundingQuery = fundingQuery.or(dateOrFilter);
 
       // Filter by verticals if specified
       if (verticalIds && verticalIds.length > 0) {
