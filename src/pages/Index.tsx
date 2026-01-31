@@ -155,16 +155,20 @@ const Index = () => {
   useEffect(() => {
     if (loading) return;
 
-    // Cancel any in-flight queries for funding_records / funding_metrics
-    // that don't match the current filter signature. This prevents stale
-    // results from old filter combos racing with new ones.
-    queryClient.cancelQueries({ queryKey: ["funding_records"] });
-    queryClient.cancelQueries({ queryKey: ["funding_metrics"] });
+    // Debounce slightly so picking dates doesn't spam requests.
+    const t = window.setTimeout(() => {
+      // Cancel in-flight requests so old responses can't overwrite the UI.
+      queryClient.cancelQueries({ queryKey: ["funding_records"], exact: false });
+      queryClient.cancelQueries({ queryKey: ["funding_metrics"], exact: false });
 
-    // Remove all cached data for these query prefixes so React Query
-    // fetches fresh when the hooks run with the new filter values.
-    queryClient.removeQueries({ queryKey: ["funding_records"], exact: false });
-    queryClient.removeQueries({ queryKey: ["funding_metrics"], exact: false });
+      // Mark stale and refetch active observers immediately.
+      queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
+      queryClient.refetchQueries({ queryKey: ["funding_records"], exact: false, type: "active" }).catch(() => {});
+      queryClient.refetchQueries({ queryKey: ["funding_metrics"], exact: false, type: "active" }).catch(() => {});
+    }, 200);
+
+    return () => window.clearTimeout(t);
   }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals]);
 
   const invokeWithAuth = async <T = any>(
