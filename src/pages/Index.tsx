@@ -43,25 +43,44 @@ const Index = () => {
   const deleteSearchMutation = useDeleteSearch();
 
   const refreshAdminStatus = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    // IMPORTANT: This must never leave the UI stuck in a loading state.
+    // We guard against network hangs with a timeout and always resolve.
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    if (!session?.user?.id) {
-      setIsAdmin(null);
-      return;
-    }
+      if (!session?.user?.id) {
+        setIsAdmin(null);
+        return;
+      }
 
-    const { data, error } = await supabase.rpc("has_role", {
-      _user_id: session.user.id,
-      _role: "admin",
-    });
+      const timeoutMs = 8000;
+      let timeoutId: number | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(() => reject(new Error("Role check timed out")), timeoutMs);
+      });
 
-    if (error) {
-      console.error("Error checking admin role:", error);
+      const rolePromise = supabase.rpc("has_role", {
+        _user_id: session.user.id,
+        _role: "admin",
+      });
+
+      const { data, error } = await Promise.race([rolePromise, timeoutPromise]);
+      if (timeoutId) window.clearTimeout(timeoutId);
+
+      if (error) {
+        console.error("Error checking admin role:", error);
+        setIsAdmin(false);
+        return;
+      }
+
+      setIsAdmin(Boolean(data));
+    } catch (err) {
+      console.error("Admin status check failed:", err);
+      // Non-blocking: treat as not admin rather than hanging the app.
       setIsAdmin(false);
-      return;
     }
-
-    setIsAdmin(Boolean(data));
   };
 
   useEffect(() => {
@@ -70,30 +89,40 @@ const Index = () => {
     // Set up auth state listener FIRST (recommended by Supabase)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
-      
-      if (!session) {
-        setIsAdmin(null);
+
+      try {
+        if (!session) {
+          setIsAdmin(null);
+          navigate("/auth");
+          return;
+        }
+
+        await refreshAdminStatus();
+      } catch (err) {
+        console.error("Auth state handling failed:", err);
+      } finally {
+        // Always end loading even if role check fails/hangs/throws
         setLoading(false);
-        navigate("/auth");
-        return;
       }
-      
-      await refreshAdminStatus();
-      setLoading(false);
     });
 
     // Then check current session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!isMounted) return;
-      
-      if (!session) {
+
+      try {
+        if (!session) {
+          navigate("/auth");
+          return;
+        }
+
+        await refreshAdminStatus();
+      } catch (err) {
+        console.error("Initial session check failed:", err);
+      } finally {
+        // Always end loading even if role check fails/hangs/throws
         setLoading(false);
-        navigate("/auth");
-        return;
       }
-      
-      await refreshAdminStatus();
-      setLoading(false);
     });
 
     return () => {
