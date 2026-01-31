@@ -121,13 +121,17 @@ export function useFundingRecords(state?: string, startDate?: Date, endDate?: Da
         query = query.in("organization_id", orgIds);
       }
 
-      // Filter by action_date (when grant was awarded) instead of grant duration
+      // Filter by action_date (when grant was awarded)
+      // Use OR filter to include records where action_date is set OR fall back to date_range_start
+      // This handles both USAspending (has action_date) and Grants.gov/legacy records
       if (startDate) {
-        query = query.gte("action_date", startDate.toISOString().split("T")[0]);
+        const startStr = startDate.toISOString().split("T")[0];
+        query = query.or(`action_date.gte.${startStr},and(action_date.is.null,date_range_start.gte.${startStr})`);
       }
 
       if (endDate) {
-        query = query.lte("action_date", endDate.toISOString().split("T")[0]);
+        const endStr = endDate.toISOString().split("T")[0];
+        query = query.or(`action_date.lte.${endStr},and(action_date.is.null,date_range_start.lte.${endStr})`);
       }
 
       const { data, error } = await query;
@@ -170,13 +174,15 @@ export function useFundingMetrics(state?: string, startDate?: Date, endDate?: Da
         fundingQuery = fundingQuery.in("organization_id", orgIds);
       }
 
-      // Filter by action_date (when grant was awarded)
+      // Filter by action_date (when grant was awarded) with fallback to date_range_start
       if (startDate) {
-        fundingQuery = fundingQuery.gte("action_date", startDate.toISOString().split("T")[0]);
+        const startStr = startDate.toISOString().split("T")[0];
+        fundingQuery = fundingQuery.or(`action_date.gte.${startStr},and(action_date.is.null,date_range_start.gte.${startStr})`);
       }
 
       if (endDate) {
-        fundingQuery = fundingQuery.lte("action_date", endDate.toISOString().split("T")[0]);
+        const endStr = endDate.toISOString().split("T")[0];
+        fundingQuery = fundingQuery.or(`action_date.lte.${endStr},and(action_date.is.null,date_range_start.lte.${endStr})`);
       }
 
       // Filter by verticals if specified

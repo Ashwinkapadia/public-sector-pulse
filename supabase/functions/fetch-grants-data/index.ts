@@ -323,7 +323,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Create funding record
+        // Create funding record - use postedDate as action_date for date filtering
         const { data: fundingRecord, error: fundingError } = await supabaseClient
           .from("funding_records")
           .insert({
@@ -334,6 +334,7 @@ serve(async (req) => {
             fiscal_year: fiscalYear,
             source: "Grants.gov",
             cfda_code: cfdaNumber,
+            action_date: postedDate || null, // Set action_date for consistent date filtering
             date_range_start: postedDate || null,
             date_range_end: opportunity.closeDate || null,
             notes: `${oppTitle} (${oppNumber})`,
