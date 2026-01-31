@@ -42,13 +42,30 @@ const Index = () => {
   const saveSearchMutation = useSaveSearch();
   const deleteSearchMutation = useDeleteSearch();
 
+  const getSessionWithTimeout = async (timeoutMs = 8000) => {
+    let timeoutId: number | undefined;
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(() => reject(new Error("getSession timed out")), timeoutMs);
+      });
+
+      const result = await Promise.race([supabase.auth.getSession(), timeoutPromise]);
+      return result as Awaited<ReturnType<typeof supabase.auth.getSession>>;
+    } catch (err) {
+      console.error("getSessionWithTimeout failed:", err);
+      return { data: { session: null }, error: err } as any;
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    }
+  };
+
   const refreshAdminStatus = async () => {
     // IMPORTANT: This must never leave the UI stuck in a loading state.
     // We guard against network hangs with a timeout and always resolve.
     try {
       const {
         data: { session },
-      } = await supabase.auth.getSession();
+      } = await getSessionWithTimeout();
 
       if (!session?.user?.id) {
         setIsAdmin(null);
@@ -107,7 +124,7 @@ const Index = () => {
     });
 
     // Then check current session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    getSessionWithTimeout().then(async ({ data: { session } }) => {
       if (!isMounted) return;
 
       try {
@@ -137,7 +154,7 @@ const Index = () => {
   ) => {
     const {
       data: { session },
-    } = await supabase.auth.getSession();
+    } = await getSessionWithTimeout();
 
     if (!session?.access_token) {
       throw new Error("Not authenticated. Please sign in again.");
@@ -246,6 +263,16 @@ const Index = () => {
     queryClient.invalidateQueries({ queryKey: ["organizations"] });
     queryClient.invalidateQueries({ queryKey: ["funding_records"] });
     queryClient.invalidateQueries({ queryKey: ["funding_metrics"] });
+
+    // Ensure active queries refetch immediately (invalidate alone can be too lazy depending on config)
+    queryClient.refetchQueries({ queryKey: ["funding_records"], type: "active" });
+    queryClient.refetchQueries({ queryKey: ["funding_metrics"], type: "active" });
+
+    // Defensive: ingestion completion/status write can race the final inserts; refetch once more shortly after
+    window.setTimeout(() => {
+      queryClient.refetchQueries({ queryKey: ["funding_records"], type: "active" });
+      queryClient.refetchQueries({ queryKey: ["funding_metrics"], type: "active" });
+    }, 1500);
     
     toast({
       title: "Prime Awards Fetch Complete",
