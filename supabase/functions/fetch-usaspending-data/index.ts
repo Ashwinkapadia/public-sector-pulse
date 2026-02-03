@@ -418,93 +418,106 @@ async function processData(
     }
 
     const searchData = await searchResponse.json();
-    console.log(`Found ${searchData.results?.length || 0} results from page 1`);
+    const page1Results = searchData.results || [];
+    console.log(`Found ${page1Results.length} results from page 1`);
 
-    // Fetch additional pages if available
-    let allResults = searchData.results || [];
-    const hasNext = searchData.page_metadata?.hasNext ?? false;
-    const maxPages = 10;
-    const totalPages = hasNext ? maxPages : 1; // If more pages exist, fetch up to 10 pages (max 1000 records)
-    
-    console.log(
-      `Page 1 fetched. hasNext=${hasNext}. Will fetch up to ${totalPages} pages (max ${maxPages * 100} records).`,
-    );
-    
-    // Update progress with total pages
+    // Fetch additional pages ONLY while more data exists
+    let allResults = page1Results;
+    let currentHasNext = searchData.page_metadata?.hasNext ?? false;
+    const maxPages = 10; // hard cap to prevent runaway fetches
+    let actualTotalPages = 1;
+
+    // Update progress with initial info (we don't know true total yet)
     await supabaseClient
       .from("fetch_progress")
       .update({
-        total_pages: totalPages,
+        total_pages: currentHasNext ? maxPages : 1, // estimate; will update as we go
         current_page: 1,
-        message: `Processing page 1 of ${totalPages}`,
+        message: `Processing page 1...`,
       })
       .eq("session_id", progressSessionId);
 
-    for (let page = 2; page <= totalPages; page++) {
+    // Dynamically fetch more pages only if hasNext is true and page returns data
+    let page = 2;
+    while (currentHasNext && page <= maxPages) {
       const pageResponse = await fetch(
         "https://api.usaspending.gov/api/v2/search/spending_by_award/",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-            body: JSON.stringify({
-              filters: {
-                recipient_locations: [
-                  {
-                    country: "USA",
-                    state: state,
-                  },
-                ],
-                time_period: [
-                  {
-                    start_date: startDate || `${fiscalYear}-01-01`,
-                    end_date: endDate || `${fiscalYear}-12-31`,
-                  },
-                ],
-                award_type_codes: ["02", "03", "04", "05"],
-              },
-              fields: [
-                "Award ID",
-                "Internal ID",
-                "Recipient Name",
-                "Recipient Location",
-                "Award Amount",
-                "Award Type",
-                "Awarding Agency",
-                "Awarding Sub Agency",
-                "Start Date",
-                "End Date",
-                "Action Date",
-                "Description",
-                "CFDA Number",
-                "CFDA Title",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filters: {
+              recipient_locations: [{ country: "USA", state: state }],
+              time_period: [
+                {
+                  start_date: startDate || `${fiscalYear}-01-01`,
+                  end_date: endDate || `${fiscalYear}-12-31`,
+                },
               ],
-              limit: 100,
-              page: page,
-              order: "desc",
-              sort: "Award Amount",
-            }),
+              award_type_codes: ["02", "03", "04", "05"],
+            },
+            fields: [
+              "Award ID",
+              "Internal ID",
+              "Recipient Name",
+              "Recipient Location",
+              "Award Amount",
+              "Award Type",
+              "Awarding Agency",
+              "Awarding Sub Agency",
+              "Start Date",
+              "End Date",
+              "Action Date",
+              "Description",
+              "CFDA Number",
+              "CFDA Title",
+            ],
+            limit: 100,
+            page: page,
+            order: "desc",
+            sort: "Award Amount",
+          }),
         }
       );
 
-      if (pageResponse.ok) {
-        const pageData = await pageResponse.json();
-        allResults = allResults.concat(pageData.results || []);
-        console.log(
-          `Found ${pageData.results?.length || 0} results from page ${page}`,
-        );
-        
-        // Update progress after each page
-        await supabaseClient
-          .from("fetch_progress")
-          .update({
-            current_page: page,
-            message: `Processing page ${page} of ${totalPages}`,
-          })
-          .eq("session_id", progressSessionId);
+      if (!pageResponse.ok) {
+        console.warn(`Page ${page} request failed, stopping pagination.`);
+        break;
       }
+
+      const pageData = await pageResponse.json();
+      const pageResults = pageData.results || [];
+      console.log(`Found ${pageResults.length} results from page ${page}`);
+
+      if (pageResults.length === 0) {
+        // No more data; stop fetching
+        console.log(`Page ${page} returned 0 results; stopping.`);
+        break;
+      }
+
+      allResults = allResults.concat(pageResults);
+      actualTotalPages = page;
+
+      // Update progress after each page
+      await supabaseClient
+        .from("fetch_progress")
+        .update({
+          total_pages: actualTotalPages,
+          current_page: page,
+          message: `Processing page ${page}...`,
+        })
+        .eq("session_id", progressSessionId);
+
+      // Check if there's another page
+      currentHasNext = pageData.page_metadata?.hasNext ?? false;
+      page++;
     }
+
+    // Final total pages update
+    await supabaseClient
+      .from("fetch_progress")
+      .update({ total_pages: actualTotalPages })
+      .eq("session_id", progressSessionId);
 
     console.log(`Total results fetched: ${allResults.length}`);
     
