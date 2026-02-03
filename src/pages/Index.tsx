@@ -150,9 +150,8 @@ const Index = () => {
     };
   }, [navigate]);
 
-  // Cancel stale queries when filters change so we only show results for
-  // the current filter set. The hooks themselves will trigger fresh fetches
-  // because their queryKeys include the filter values.
+  // Hard-reset cache when filters change to prevent stale data from appearing.
+  // We remove old cached entries entirely, then let the hooks refetch fresh data.
   useEffect(() => {
     if (loading) return;
 
@@ -162,11 +161,13 @@ const Index = () => {
       queryClient.cancelQueries({ queryKey: ["funding_records"], exact: false });
       queryClient.cancelQueries({ queryKey: ["funding_metrics"], exact: false });
 
-      // Mark stale and refetch active observers immediately.
+      // CRITICAL: Remove all cached data for these queries so we never show stale rows.
+      queryClient.removeQueries({ queryKey: ["funding_records"], exact: false });
+      queryClient.removeQueries({ queryKey: ["funding_metrics"], exact: false });
+
+      // Let the hooks refetch via their observers
       queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
-      queryClient.refetchQueries({ queryKey: ["funding_records"], exact: false, type: "active" }).catch(() => {});
-      queryClient.refetchQueries({ queryKey: ["funding_metrics"], exact: false, type: "active" }).catch(() => {});
     }, 200);
 
     return () => window.clearTimeout(t);
@@ -289,10 +290,13 @@ const Index = () => {
       endDate: endDate?.toISOString(),
       selectedVerticalsCount: selectedVerticals.length,
     });
-    
-    // Invalidate all queries to refresh data
-    // NOTE: useFundingRecords/useFundingMetrics include params in their query keys;
-    // refetching with exact:false ensures we match all variants.
+
+    // HARD-RESET cache before refetch to ensure NO stale rows appear
+    queryClient.removeQueries({ queryKey: ["organizations"], exact: false });
+    queryClient.removeQueries({ queryKey: ["funding_records"], exact: false });
+    queryClient.removeQueries({ queryKey: ["funding_metrics"], exact: false });
+
+    // Invalidate and refetch
     queryClient.invalidateQueries({ queryKey: ["organizations"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
@@ -311,6 +315,8 @@ const Index = () => {
 
     // Defensive: ingestion completion/status write can race the final inserts; refetch once more shortly after
     window.setTimeout(() => {
+      queryClient.removeQueries({ queryKey: ["funding_records"], exact: false });
+      queryClient.removeQueries({ queryKey: ["funding_metrics"], exact: false });
       Promise.all([
         queryClient.refetchQueries({ queryKey: ["funding_records"], exact: false, type: "all" }),
         queryClient.refetchQueries({ queryKey: ["funding_metrics"], exact: false, type: "all" }),
@@ -318,7 +324,7 @@ const Index = () => {
         .then(() => console.debug("handleFetchComplete: delayed refetch done"))
         .catch((err) => console.warn("handleFetchComplete: delayed refetch failed", err));
     }, 1500);
-    
+
     toast({
       title: "Prime Awards Fetch Complete",
       description: "Dashboard updated with new prime award data",
@@ -522,11 +528,16 @@ const Index = () => {
       setSelectedVerticals([]);
       setFetchSessionId(null);
 
-      // Invalidate cached queries so the dashboard reflects cleared data
-      queryClient.invalidateQueries({ queryKey: ["organizations"] });
-      queryClient.invalidateQueries({ queryKey: ["funding_records"] });
-      queryClient.invalidateQueries({ queryKey: ["funding_metrics"] });
-      queryClient.invalidateQueries({ queryKey: ["subawards-by-state"] });
+      // HARD-RESET: Remove all cached funding/metrics/org data so stale rows cannot appear.
+      queryClient.removeQueries({ queryKey: ["organizations"], exact: false });
+      queryClient.removeQueries({ queryKey: ["funding_records"], exact: false });
+      queryClient.removeQueries({ queryKey: ["funding_metrics"], exact: false });
+      queryClient.removeQueries({ queryKey: ["subawards-by-state"], exact: false });
+      // Also invalidate to trigger fresh fetches for active observers
+      queryClient.invalidateQueries({ queryKey: ["organizations"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["subawards-by-state"], exact: false });
 
       const deleted = data?.deleted || {};
       toast({

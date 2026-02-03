@@ -88,9 +88,18 @@ export function useFundingRecords(
   endDate?: Date,
   verticalIds?: string[]
 ) {
+  // Compute stable date strings for query key and debugging
+  const startKey = toDateKey(startDate);
+  const endKey = toDateKey(endDate);
+  const verticalsKey = verticalIds?.join(",") || "";
+
   return useQuery({
-    queryKey: ["funding_records", state, toDateKey(startDate), toDateKey(endDate), verticalIds?.join(",") || ""],
+    queryKey: ["funding_records", state, startKey, endKey, verticalsKey],
+    // Never serve stale cached data; always fetch fresh when filters change
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
+      console.log("[useFundingRecords] Fetching", { state, startKey, endKey, verticalsKey });
       // First get organization IDs for the selected state
       let orgIds: string[] | undefined;
       if (state && state !== "ALL") {
@@ -138,6 +147,7 @@ export function useFundingRecords(
       // IMPORTANT: build a single OR filter string so we don't override conditions.
       // This handles both USAspending (has action_date) and Grants.gov/legacy records.
       const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
+      console.log("[useFundingRecords] dateOrFilter:", dateOrFilter);
       if (dateOrFilter) query = query.or(dateOrFilter);
 
       // Filter by verticals (server-side) when specified
@@ -158,16 +168,16 @@ export function useFundingMetrics(
   endDate?: Date,
   verticalIds?: string[]
 ) {
+  const startKey = toDateKey(startDate);
+  const endKey = toDateKey(endDate);
+  const verticalsKey = verticalIds?.join(",") || "";
+
   return useQuery({
-    queryKey: [
-      "funding_metrics",
-      state,
-      toDateKey(startDate),
-      toDateKey(endDate),
-      // keep verticalIds stable for hashing
-      verticalIds?.join(",") || "",
-    ],
+    queryKey: ["funding_metrics", state, startKey, endKey, verticalsKey],
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
+      console.log("[useFundingMetrics] Fetching", { state, startKey, endKey, verticalsKey });
       // First get organization IDs for the selected state
       let orgIds: string[] | undefined;
       if (state && state !== "ALL") {
@@ -199,6 +209,7 @@ export function useFundingMetrics(
 
       // Filter by action_date (when grant was awarded) with fallback to date_range_start
       const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
+      console.log("[useFundingMetrics] dateOrFilter:", dateOrFilter);
       if (dateOrFilter) fundingQuery = fundingQuery.or(dateOrFilter);
 
       // Filter by verticals if specified
