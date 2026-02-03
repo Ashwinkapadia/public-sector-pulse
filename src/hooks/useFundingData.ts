@@ -100,21 +100,6 @@ export function useFundingRecords(
     refetchOnMount: "always",
     queryFn: async () => {
       console.log("[useFundingRecords] Fetching", { state, startKey, endKey, verticalsKey });
-      // First get organization IDs for the selected state
-      let orgIds: string[] | undefined;
-      if (state && state !== "ALL") {
-        const { data: orgs, error: orgError } = await supabase
-          .from("organizations")
-          .select("id")
-          .eq("state", state);
-        
-        if (orgError) throw orgError;
-        orgIds = orgs.map(org => org.id);
-        
-        // If no organizations found for this state, return empty array
-        if (orgIds.length === 0) return [];
-      }
-
       // Build the main query - include source field explicitly
       let query = supabase
         .from("funding_records")
@@ -132,15 +117,15 @@ export function useFundingRecords(
           cfda_code,
           source,
           action_date,
-          organizations (*),
+          organizations!inner (*),
           verticals (*),
           grant_types (*)
         `)
         .order("created_at", { ascending: false });
 
-      // Filter by organization IDs if state was selected
-      if (orgIds) {
-        query = query.in("organization_id", orgIds);
+      // Filter by state via inner join (prevents huge `in()` lists and guarantees state is applied)
+      if (state && state !== "ALL") {
+        query = query.eq("organizations.state", state);
       }
 
       // Filter by action_date (when grant was awarded)
@@ -178,33 +163,13 @@ export function useFundingMetrics(
     refetchOnMount: "always",
     queryFn: async () => {
       console.log("[useFundingMetrics] Fetching", { state, startKey, endKey, verticalsKey });
-      // First get organization IDs for the selected state
-      let orgIds: string[] | undefined;
+      // Get funding data with date filters. Filter by state via inner join so state is always enforced.
+      let fundingQuery = supabase
+        .from("funding_records")
+        .select("organization_id, amount, vertical_id, organizations!inner(state)");
+
       if (state && state !== "ALL") {
-        const { data: orgs, error: orgError } = await supabase
-          .from("organizations")
-          .select("id")
-          .eq("state", state);
-        
-        if (orgError) throw orgError;
-        orgIds = orgs.map(org => org.id);
-        
-        // If no organizations found for this state, return empty array
-        if (orgIds.length === 0) {
-          return {
-            totalOrganizations: 0,
-            totalFunding: 0,
-            avgFunding: 0,
-            activePrograms: 0,
-          };
-        }
-      }
-      
-      // Get funding data with date filters
-      let fundingQuery = supabase.from("funding_records").select("organization_id, amount, vertical_id");
-      
-      if (orgIds) {
-        fundingQuery = fundingQuery.in("organization_id", orgIds);
+        fundingQuery = fundingQuery.eq("organizations.state", state);
       }
 
       // Filter by action_date (when grant was awarded) with fallback to date_range_start
@@ -223,7 +188,6 @@ export function useFundingMetrics(
         state,
         startDate: startDate?.toISOString(),
         endDate: endDate?.toISOString(),
-        orgIdsCount: orgIds?.length,
         fundingRecordsCount: fundingData?.length,
       });
 
