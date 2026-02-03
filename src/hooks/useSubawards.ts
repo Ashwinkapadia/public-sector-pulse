@@ -49,9 +49,16 @@ export function useSubawards(fundingRecordId?: string) {
 }
 
 export function useSubawardsByState(state?: string, startDate?: Date, endDate?: Date) {
+  // Stable date keys for query caching
+  const startKey = startDate ? startDate.toISOString().split("T")[0] : undefined;
+  const endKey = endDate ? endDate.toISOString().split("T")[0] : undefined;
+
   return useQuery({
-    queryKey: ["subawards-by-state", state, startDate, endDate],
+    queryKey: ["subawards-by-state", state, startKey, endKey],
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
+      console.log("[useSubawardsByState] Fetching", { state, startKey, endKey });
       let query = supabase
         .from("subawards")
         .select(`
