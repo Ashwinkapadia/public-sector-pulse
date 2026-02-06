@@ -37,21 +37,21 @@ export default function SubAwards() {
     deleteSearch,
   } = useSavedSubawardSearches();
 
-  // Handle cfda_list query parameter from Prime Awards page
+  // Handle aln_list query parameter from Prime Awards page
   useEffect(() => {
     if (autoSearchTriggered.current || loading) return;
 
-    const cfdaList = searchParams.get("cfda_list");
-    if (cfdaList && formRef.current) {
+    const alnList = searchParams.get("cfda_list") || searchParams.get("aln_list");
+    if (alnList && formRef.current) {
       autoSearchTriggered.current = true;
 
-      // Parse all CFDA codes (no limit)
-      const codes = cfdaList.split(",").map(c => c.trim()).filter(Boolean);
-      const cfdaString = codes.join(",");
+      // Parse all ALN codes (no limit)
+      const codes = alnList.split(",").map(c => c.trim()).filter(Boolean);
+      const alnString = codes.join(",");
 
-      // Set the CFDA field and trigger search with the value directly
-      formRef.current.setCfdaNumber(cfdaString);
-      formRef.current.triggerSearch(cfdaString);
+      // Set the ALN field and trigger search with the value directly
+      formRef.current.setCfdaNumber(alnString);
+      formRef.current.triggerSearch(alnString);
       
       toast({
         title: "Sub-Awards Loaded",
@@ -104,7 +104,7 @@ export default function SubAwards() {
       toast({
         variant: "destructive",
         title: "Search Required",
-        description: "Please enter a CFDA number, keywords, or select an agency",
+        description: "Please enter an ALN number, keywords, or select an agency",
       });
       return;
     }
@@ -172,7 +172,7 @@ export default function SubAwards() {
             Search Federal Sub-Awards
           </h2>
           <p className="text-muted-foreground">
-            Search for sub-awards by CFDA number or keywords. This searches
+            Search for sub-awards by ALN (Assistance Listing Number) or keywords. This searches
             directly against USAspending.gov's sub-award database.
           </p>
         </div>

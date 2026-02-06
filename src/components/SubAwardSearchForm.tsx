@@ -175,15 +175,15 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="cfda">CFDA Number</Label>
+              <Label htmlFor="aln">ALN Number</Label>
               <Input
-                id="cfda"
+                id="aln"
                 placeholder="e.g., 93.778"
                 value={cfdaNumber}
                 onChange={(e) => setCfdaNumber(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Catalog of Federal Domestic Assistance number
+                Assistance Listing Number (formerly CFDA)
               </p>
             </div>
             <div className="space-y-2">
