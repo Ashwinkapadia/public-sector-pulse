@@ -78,11 +78,12 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
   const [keywords, setKeywords] = useState("");
   const [state, setState] = useState("ALL");
   const [agencies, setAgencies] = useState<Agency[]>([]);
+  // Use explicit year, month, day to avoid timezone parsing issues
   const [startDate, setStartDate] = useState<Date | undefined>(
-    new Date("2024-01-01")
+    new Date(2024, 0, 1) // Jan 1, 2024 (month is 0-indexed)
   );
   const [endDate, setEndDate] = useState<Date | undefined>(
-    new Date("2024-12-31")
+    new Date(2024, 11, 31) // Dec 31, 2024
   );
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
