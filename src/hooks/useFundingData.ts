@@ -93,11 +93,17 @@ export function useFundingRecords(
   const endKey = toDateKey(endDate);
   const verticalsKey = verticalIds?.join(",") || "";
 
+  // Only enable the query when at least one filter is set to avoid showing all data
+  // This prevents the "undefined filters" race condition after cache purges
+  const hasFilters = Boolean(state) || Boolean(startDate) || Boolean(endDate) || (verticalIds && verticalIds.length > 0);
+
   return useQuery({
     queryKey: ["funding_records", state, startKey, endKey, verticalsKey],
     // Never serve stale cached data; always fetch fresh when filters change
     staleTime: 0,
     refetchOnMount: "always",
+    // Disable query until user sets at least one filter
+    enabled: hasFilters,
     queryFn: async () => {
       console.log("[useFundingRecords] Fetching", { state, startKey, endKey, verticalsKey });
       // Build the main query - include source field explicitly
@@ -157,10 +163,15 @@ export function useFundingMetrics(
   const endKey = toDateKey(endDate);
   const verticalsKey = verticalIds?.join(",") || "";
 
+  // Only enable the query when at least one filter is set
+  const hasFilters = Boolean(state) || Boolean(startDate) || Boolean(endDate) || (verticalIds && verticalIds.length > 0);
+
   return useQuery({
     queryKey: ["funding_metrics", state, startKey, endKey, verticalsKey],
     staleTime: 0,
     refetchOnMount: "always",
+    // Disable query until user sets at least one filter
+    enabled: hasFilters,
     queryFn: async () => {
       console.log("[useFundingMetrics] Fetching", { state, startKey, endKey, verticalsKey });
       // Get funding data with date filters. Filter by state via inner join so state is always enforced.
