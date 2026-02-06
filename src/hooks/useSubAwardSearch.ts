@@ -45,23 +45,28 @@ export function useSubAwardSearch() {
     setLastParams(params);
 
     try {
-      // Award type codes for assistance (grants) sub-awards
+      // Award type codes for Grants specifically
       // 02=Block Grant, 03=Formula Grant, 04=Project Grant, 05=Cooperative Agreement
-      // 06=Direct Payment, 07=Direct Loan, 08=Guaranteed Loan, 09=Insurance, 10=Direct Payment (unrestricted), 11=Other
-      const assistanceAwardTypes = ["02", "03", "04", "05", "06", "07", "08", "09", "10", "11"];
+      const grantAwardTypes = ["02", "03", "04", "05"];
 
       const payload: any = {
-        subawards: true,
+        subawards: true, // Set to true to get sub-grants to local orgs
         filters: {
-          award_type_codes: assistanceAwardTypes,
+          award_type_codes: grantAwardTypes,
           time_period: [
             {
-              start_date: params.startDate || "2024-01-01",
-              end_date: params.endDate || "2024-12-31",
+              start_date: params.startDate || "2023-10-01",
+              end_date: params.endDate || "2024-09-30",
             },
           ],
         },
         fields: [
+          "Award ID",
+          "Recipient Name",
+          "Award Amount",
+          "Description",
+          "Assistance Listing Number",
+          "Assistance Listing Title",
           "Sub-Award ID",
           "Sub-Awardee Name",
           "Prime Recipient Name",
@@ -70,22 +75,20 @@ export function useSubAwardSearch() {
           "Sub-Award Description",
           "Sub-Award Primary Place of Performance",
         ],
-        limit: params.limit || 100,
+        limit: params.limit || 60,
         page: params.page || 1,
       };
 
-      // Add CFDA number(s) if provided - supports comma-separated list
+      // Add CFDA/ALN number(s) if provided - supports comma-separated list
       const cfda = params.cfdaNumber?.trim();
       if (cfda) {
-        // Split by comma to support multiple CFDA codes (e.g., "93.778,16.034")
+        // Split by comma to support multiple codes (e.g., "93.778,16.034")
         const cfdaList = cfda.split(",").map(c => c.trim()).filter(c => c.length > 0);
-        // USAspending documentation/examples vary between `program_numbers` and `cfda_numbers`.
-        // We start with `program_numbers` (per original spec) and fall back to `cfda_numbers`
-        // if the API returns a 422.
+        // program_numbers is the correct filter for Assistance Listing Numbers
         payload.filters.program_numbers = cfdaList;
       }
 
-      // Add keywords if provided (keep as a single phrase)
+      // Add keywords if provided
       const keywords = params.keywords?.trim();
       if (keywords) {
         payload.filters.keywords = [keywords];
