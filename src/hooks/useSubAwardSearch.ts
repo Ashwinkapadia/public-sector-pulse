@@ -45,28 +45,51 @@ export function useSubAwardSearch() {
     setLastParams(params);
 
     try {
-      // Award type codes for Grants specifically
-      // 02=Block Grant, 03=Formula Grant, 04=Project Grant, 05=Cooperative Agreement
-      const grantAwardTypes = ["02", "03", "04", "05"];
+      // Build filters object
+      const filters: any = {
+        time_period: [{ 
+          start_date: params.startDate || "2024-10-01", 
+          end_date: params.endDate || "2025-09-30" 
+        }],
+        award_type_codes: ["02", "03", "04", "05"] // Typical Grant codes
+      };
 
-      const payload: any = {
-        subawards: true, // Set to true to get sub-grants to local orgs
-        filters: {
-          award_type_codes: grantAwardTypes,
-          time_period: [
-            {
-              start_date: params.startDate || "2023-10-01",
-              end_date: params.endDate || "2024-09-30",
-            },
-          ],
-        },
+      // Add ALN/CFDA filter if provided
+      const cfda = params.cfdaNumber?.trim();
+      if (cfda) {
+        const cfdaList = cfda.split(",").map(c => c.trim()).filter(c => c.length > 0);
+        filters.program_numbers = cfdaList;
+      }
+
+      // Add keywords if provided
+      const keywords = params.keywords?.trim();
+      if (keywords) {
+        filters.keywords = [keywords];
+      }
+
+      // Add state filter if provided
+      const state = params.state?.trim();
+      if (state && state !== "ALL") {
+        filters.place_of_performance_locations = [{ country: "USA", state: state }];
+      }
+
+      // Add agencies filter if selected
+      const agencies = params.agencies || [];
+      if (agencies.length > 0 && agencies.length !== AGENCIES.length) {
+        filters.agencies = agencies.map((agencyName) => ({
+          type: "awarding",
+          tier: "toptier",
+          name: agencyName,
+        }));
+      }
+
+      const payload = {
+        filters,
         fields: [
-          "Award ID",
-          "Recipient Name",
-          "Award Amount",
-          "Description",
+          "Award ID", 
+          "Recipient Name", 
+          "Award Amount", 
           "Assistance Listing Number",
-          "Assistance Listing Title",
           "Sub-Award ID",
           "Sub-Awardee Name",
           "Prime Recipient Name",
@@ -75,92 +98,27 @@ export function useSubAwardSearch() {
           "Sub-Award Description",
           "Sub-Award Primary Place of Performance",
         ],
-        limit: params.limit || 60,
+        limit: params.limit || 50,
         page: params.page || 1,
+        subawards: true
       };
 
-      // Add CFDA/ALN number(s) if provided - supports comma-separated list
-      const cfda = params.cfdaNumber?.trim();
-      if (cfda) {
-        // Split by comma to support multiple codes (e.g., "93.778,16.034")
-        const cfdaList = cfda.split(",").map(c => c.trim()).filter(c => c.length > 0);
-        // program_numbers is the correct filter for Assistance Listing Numbers
-        payload.filters.program_numbers = cfdaList;
-      }
+      console.log("SubAward search payload:", JSON.stringify(payload, null, 2));
 
-      // Add keywords if provided
-      const keywords = params.keywords?.trim();
-      if (keywords) {
-        payload.filters.keywords = [keywords];
-      }
-
-      // Add state/location filter if provided (not "ALL")
-      const state = params.state?.trim();
-      if (state && state !== "ALL") {
-        payload.filters.place_of_performance_locations = [
-          { country: "USA", state: state }
-        ];
-      }
-
-      // Add agencies filter if selected (and not all agencies)
-      const agencies = params.agencies || [];
-      const allAgenciesSelected = agencies.length === AGENCIES.length;
-      if (agencies.length > 0 && !allAgenciesSelected) {
-        payload.filters.agencies = agencies.map((agencyName) => ({
-          type: "awarding",
-          tier: "toptier",
-          name: agencyName,
-        }));
-      }
-
-      const doRequest = async (body: any) => {
-        const res = await fetch(
-          "https://api.usaspending.gov/api/v2/search/spending_by_award/",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(body),
-          }
-        );
-
-        const text = await res.text();
-        let json: any = null;
-        try {
-          json = text ? JSON.parse(text) : null;
-        } catch {
-          json = null;
+      const response = await fetch(
+        "https://api.usaspending.gov/api/v2/search/spending_by_award/",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         }
+      );
 
-        return { res, json, text };
-      };
-
-      let { res: response, json: data, text } = await doRequest(payload);
-
-      // Fallback: if CFDA-only (or CFDA+keywords) yields 422, retry with cfda_numbers.
-      if (!response.ok && response.status === 422 && cfda) {
-        const cfdaList = cfda.split(",").map(c => c.trim()).filter(c => c.length > 0);
-        const retryPayload = {
-          ...payload,
-          filters: {
-            ...payload.filters,
-            cfda_numbers: cfdaList,
-          },
-        };
-        delete (retryPayload.filters as any).program_numbers;
-
-        ({ res: response, json: data, text } = await doRequest(retryPayload));
-      }
+      const data = await response.json();
 
       if (!response.ok) {
-        const apiMsg =
-          data?.detail ||
-          data?.message ||
-          data?.error ||
-          (typeof data === "string" ? data : null) ||
-          text?.slice(0, 300);
-        throw new Error(apiMsg || `API error: ${response.status}`);
+        const apiMsg = data?.detail || data?.message || data?.error || `API error: ${response.status}`;
+        throw new Error(apiMsg);
       }
 
       // Map API response to our interface
