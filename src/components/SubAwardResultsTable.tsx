@@ -230,7 +230,7 @@ export function SubAwardResultsTable({
           <div className="text-center text-muted-foreground">
             <p className="text-lg">No sub-awards found</p>
             <p className="text-sm mt-2">
-              Try adjusting your CFDA number or keywords
+              Try adjusting your ALN number or keywords
             </p>
           </div>
         </CardContent>

@@ -107,8 +107,8 @@ export const PRIME_AWARD_FIELDS = [
   "End Date",
   "Action Date",
   "Description",
-  "CFDA Number",
-  "CFDA Title",
+  "Assistance Listing Number",
+  "Assistance Listing Title",
 ];
 
 /**

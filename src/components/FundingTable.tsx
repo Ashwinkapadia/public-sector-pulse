@@ -123,26 +123,26 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
       return;
     }
 
-    // Extract unique CFDA codes from all displayed records
-    const allCfdaCodes = displayRecords
+    // Extract unique ALN codes from all displayed records
+    const allAlnCodes = displayRecords
       .map(record => record.cfda_code || record.grant_types?.cfda_code)
       .filter((code): code is string => !!code && code.trim() !== "");
     
-    const uniqueCfdaCodes = [...new Set(allCfdaCodes)];
+    const uniqueAlnCodes = [...new Set(allAlnCodes)];
 
-    if (uniqueCfdaCodes.length === 0) {
+    if (uniqueAlnCodes.length === 0) {
       toast({
         variant: "destructive",
-        title: "No CFDA codes",
-        description: "No CFDA codes found in the current results.",
+        title: "No ALN codes",
+        description: "No ALN codes found in the current results.",
       });
       return;
     }
 
-    // Include all unique CFDA codes (no limit)
-    const cfdaList = uniqueCfdaCodes.join(",");
+    // Include all unique ALN codes (no limit)
+    const alnList = uniqueAlnCodes.join(",");
 
-    navigate(`/sub-awards?cfda_list=${encodeURIComponent(cfdaList)}`);
+    navigate(`/sub-awards?aln_list=${encodeURIComponent(alnList)}`);
   };
 
   const exportToCSV = () => {
@@ -316,7 +316,7 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
-              <TableHead>CFDA Code</TableHead>
+              <TableHead>ALN Code</TableHead>
               <TableHead>Grant Type</TableHead>
               <TableHead>
                 <Button
