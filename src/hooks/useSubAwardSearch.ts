@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Agency, AGENCIES } from "@/components/AgencyMultiSelect";
+import { getBaseFilters, SUB_AWARD_FIELDS } from "@/lib/usaspendingFilters";
 
 export interface SubAwardResult {
   subAwardId: string;
@@ -45,62 +46,26 @@ export function useSubAwardSearch() {
     setLastParams(params);
 
     try {
-      // Build filters object
-      const filters: any = {
-        time_period: [{ 
-          start_date: params.startDate || "2024-10-01", 
-          end_date: params.endDate || "2025-09-30" 
-        }],
-        award_type_codes: ["02", "03", "04", "05"] // Typical Grant codes
-      };
-
-      // Add ALN/CFDA filter if provided
-      const cfda = params.cfdaNumber?.trim();
-      if (cfda) {
-        const cfdaList = cfda.split(",").map(c => c.trim()).filter(c => c.length > 0);
-        filters.program_numbers = cfdaList;
-      }
-
-      // Add keywords if provided
-      const keywords = params.keywords?.trim();
-      if (keywords) {
-        filters.keywords = [keywords];
-      }
-
-      // Add state filter if provided
-      const state = params.state?.trim();
-      if (state && state !== "ALL") {
-        filters.place_of_performance_locations = [{ country: "USA", state: state }];
-      }
-
-      // Add agencies filter if selected
+      // Get consistent base filters (Rule 1: arrays, Rule 2: grant codes only)
       const agencies = params.agencies || [];
-      if (agencies.length > 0 && agencies.length !== AGENCIES.length) {
-        filters.agencies = agencies.map((agencyName) => ({
-          type: "awarding",
-          tier: "toptier",
-          name: agencyName,
-        }));
-      }
+      const allAgenciesSelected = agencies.length === AGENCIES.length;
+
+      const filters = getBaseFilters({
+        alnNumber: params.cfdaNumber,
+        keywords: params.keywords,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        state: params.state,
+        agencies: agencies.length > 0 && !allAgenciesSelected ? agencies : undefined,
+        useRecipientLocation: false, // Sub-awards use place_of_performance
+      });
 
       const payload = {
         filters,
-        fields: [
-          "Award ID", 
-          "Recipient Name", 
-          "Award Amount", 
-          "Assistance Listing Number",
-          "Sub-Award ID",
-          "Sub-Awardee Name",
-          "Prime Recipient Name",
-          "Sub-Award Amount",
-          "Sub-Award Date",
-          "Sub-Award Description",
-          "Sub-Award Primary Place of Performance",
-        ],
+        fields: SUB_AWARD_FIELDS, // Rule 3: Sub-award specific field names
+        subawards: true, // Toggle to sub-awards mode
         limit: params.limit || 50,
         page: params.page || 1,
-        subawards: true
       };
 
       console.log("SubAward search payload:", JSON.stringify(payload, null, 2));
@@ -121,10 +86,10 @@ export function useSubAwardSearch() {
         throw new Error(apiMsg);
       }
 
-      // Map API response to our interface
+      // Map API response to our interface (Rule 3: handle sub-award field names)
       const mappedResults: SubAwardResult[] = (data.results || []).map(
         (item: any) => {
-          // Parse location from "Sub-Award Primary Place of Performance" object or string
+          // Parse location from "Sub-Award Primary Place of Performance"
           const pop = item["Sub-Award Primary Place of Performance"];
           let city = "";
           let stateCode = "";
@@ -132,7 +97,6 @@ export function useSubAwardSearch() {
             city = pop.city || "";
             stateCode = pop.state_code || pop.state || "";
           } else if (typeof pop === "string") {
-            // Sometimes returned as "City, ST"
             const parts = pop.split(",").map((s: string) => s.trim());
             city = parts[0] || "";
             stateCode = parts[1] || "";
@@ -140,9 +104,9 @@ export function useSubAwardSearch() {
 
           return {
             subAwardId: item["Sub-Award ID"] || "",
-            subRecipient: item["Sub-Awardee Name"] || "Unknown",
+            subRecipient: item["Sub-Awardee Name"] || item["Recipient Name"] || "Unknown",
             primeAwardee: item["Prime Recipient Name"] || "Unknown",
-            amount: parseFloat(item["Sub-Award Amount"]) || 0,
+            amount: parseFloat(item["Sub-Award Amount"] || item["Award Amount"]) || 0,
             date: item["Sub-Award Date"] || "",
             city,
             stateCode,

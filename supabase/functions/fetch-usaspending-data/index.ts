@@ -363,7 +363,8 @@ async function processData(
       ? new Date(startDate).getFullYear()
       : currentYear;
 
-    // Search for spending data by state
+    // Search for spending data by state - PRIME AWARDS
+    // Using clean filtering logic: award_type_codes 02-05 for Grants, subawards: false
     const searchResponse = await fetch(
       "https://api.usaspending.gov/api/v2/search/spending_by_award/",
       {
@@ -371,43 +372,45 @@ async function processData(
         headers: {
           "Content-Type": "application/json",
         },
-          body: JSON.stringify({
-            filters: {
-              recipient_locations: [
-                {
-                  country: "USA",
-                  state: state,
-                },
-              ],
-              time_period: [
-                {
-                  start_date: startDate || `${fiscalYear}-01-01`,
-                  end_date: endDate || `${fiscalYear}-12-31`,
-                },
-              ],
-              award_type_codes: ["02", "03", "04", "05"],
-            },
-            fields: [
-              "Award ID",
-              "Internal ID",
-              "Recipient Name",
-              "Recipient Location",
-              "Award Amount",
-              "Award Type",
-              "Awarding Agency",
-              "Awarding Sub Agency",
-              "Start Date",
-              "End Date",
-              "Action Date",
-              "Description",
-              "CFDA Number",
-              "CFDA Title",
+        body: JSON.stringify({
+          filters: {
+            recipient_locations: [
+              {
+                country: "USA",
+                state: state,
+              },
             ],
-            limit: 100,
-            page: 1,
-            order: "desc",
-            sort: "Award Amount",
-          }),
+            time_period: [
+              {
+                start_date: startDate || `${fiscalYear}-01-01`,
+                end_date: endDate || `${fiscalYear}-12-31`,
+              },
+            ],
+            // Grant award type codes: 02=Block, 03=Formula, 04=Project, 05=Cooperative Agreement
+            award_type_codes: ["02", "03", "04", "05"],
+          },
+          fields: [
+            "Award ID",
+            "Internal ID",
+            "Recipient Name",
+            "Recipient Location",
+            "Award Amount",
+            "Award Type",
+            "Awarding Agency",
+            "Awarding Sub Agency",
+            "Start Date",
+            "End Date",
+            "Action Date",
+            "Description",
+            "CFDA Number",
+            "CFDA Title",
+          ],
+          subawards: false, // Explicitly Prime Awards only
+          limit: 100,
+          page: 1,
+          order: "desc",
+          sort: "Award Amount",
+        }),
       }
     );
 
@@ -454,6 +457,7 @@ async function processData(
                   end_date: endDate || `${fiscalYear}-12-31`,
                 },
               ],
+              // Grant award type codes: 02=Block, 03=Formula, 04=Project, 05=Cooperative Agreement
               award_type_codes: ["02", "03", "04", "05"],
             },
             fields: [
@@ -472,6 +476,7 @@ async function processData(
               "CFDA Number",
               "CFDA Title",
             ],
+            subawards: false, // Explicitly Prime Awards only
             limit: 100,
             page: page,
             order: "desc",
