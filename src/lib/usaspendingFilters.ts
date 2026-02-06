@@ -1,11 +1,17 @@
 /**
  * Shared USAspending API filter utilities
  * Ensures consistent filtering logic across prime and sub-award searches
+ * 
+ * Key Rules:
+ * 1. program_numbers must be Array of Strings (even for single values)
+ * 2. award_type_codes 02-05 = Grants only (not contracts/loans)
+ * 3. time_period must be array of objects with YYYY-MM-DD format
+ * 4. Prime awards filter by action_date, Sub-awards by sub_action_date
  */
 
 export interface TimeRange {
-  start_date: string;
-  end_date: string;
+  start_date: string; // Format: YYYY-MM-DD
+  end_date: string;   // Format: YYYY-MM-DD
 }
 
 export interface BaseFilters {

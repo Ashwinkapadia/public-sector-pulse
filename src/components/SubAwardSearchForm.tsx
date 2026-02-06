@@ -114,6 +114,16 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate date range: start must be before end
+    if (startDate && endDate && startDate > endDate) {
+      toast({
+        title: "Invalid Date Range",
+        description: "Start date must be before end date",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Show warning toast if searching by agency only
     if (isAgencyOnlySearch) {
       toast({
@@ -123,6 +133,7 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
       });
     }
     
+    // Use YYYY-MM-DD format for API compatibility
     onSearch(
       cfdaNumber,
       keywords,
