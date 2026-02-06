@@ -556,13 +556,14 @@ async function processData(
     const errors: string[] = [];
 
     // Get existing funding records to prevent duplicates
+    // Key now includes action_date so same-amount grants on different dates are preserved
     const { data: existingFundingRecords } = await supabaseClient
       .from("funding_records")
-      .select("organization_id, amount, fiscal_year, source")
+      .select("organization_id, amount, fiscal_year, action_date, source")
       .eq("source", "USAspending.gov");
     
     existingFundingRecords?.forEach((record: any) => {
-      existingRecords.add(`${record.organization_id}-${record.amount}-${record.fiscal_year}`);
+      existingRecords.add(`${record.organization_id}-${record.amount}-${record.fiscal_year}-${record.action_date || ''}`);
     });
 
     // Process each result
@@ -709,8 +710,8 @@ async function processData(
           processedOrgs.add(recipientName);
         }
 
-        // Check for duplicate funding record
-        const recordKey = `${organizationId}-${awardAmount}-${fiscalYear}`;
+        // Check for duplicate funding record (includes action_date to distinguish same-amount grants)
+        const recordKey = `${organizationId}-${awardAmount}-${fiscalYear}-${actionDateStr || ''}`;
         if (existingRecords.has(recordKey)) {
           console.log(`Skipping duplicate record for ${recipientName}`);
           continue;
