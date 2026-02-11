@@ -48,32 +48,35 @@ Deno.serve(async (req) => {
         });
       }
 
-      const fmtStart = new Date(startDate).toLocaleDateString("en-US", { timeZone: "UTC" });
-      const fmtEnd = new Date(endDate).toLocaleDateString("en-US", { timeZone: "UTC" });
+      // Use the Assistance Listings API for grants with ALN/CFDA numbers
+      const url = `https://api.sam.gov/assistance-listings/v1/search?api_key=${samApiKey}&publishedDateFrom=${startDate}&publishedDateTo=${endDate}&limit=50`;
 
-      const url = `https://api.sam.gov/opportunities/v2/search?api_key=${samApiKey}&postedFrom=${fmtStart}&postedTo=${fmtEnd}&limit=50&ptype=g`;
-
-      console.log("SAM.gov request:", url.replace(samApiKey, "***"));
+      console.log("SAM.gov Assistance Listings request:", url.replace(samApiKey, "***"));
 
       const response = await fetch(url);
-      const data = await response.json();
-
+      
       if (!response.ok) {
-        console.error("SAM.gov error:", JSON.stringify(data));
-        return new Response(JSON.stringify({ error: data.error?.message || `SAM.gov API error: ${response.status}` }), {
+        const errorText = await response.text();
+        console.error("SAM.gov error:", errorText);
+        return new Response(JSON.stringify({ error: `SAM.gov API error: ${response.status}` }), {
           status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const results = (data.opportunitiesData || []).map((item: any) => ({
-        aln: item.cfdaNumber || item.alternativeReferenceCode || "N/A",
-        title: item.title || "Untitled",
-        agency: item.fullParentPathName || item.departmentName || "Unknown",
-        link: item.uiLink || "",
-        postedDate: item.postedDate || "",
-        closeDate: item.archiveDate || item.responseDeadLine || "",
-        type: item.type || "",
+      const data = await response.json();
+      console.log("SAM.gov response keys:", JSON.stringify(Object.keys(data)));
+
+      // The API returns assistanceListingsData array
+      const listings = data.assistanceListingsData || data.results || [];
+      const results = (Array.isArray(listings) ? listings : []).map((item: any) => ({
+        aln: item.assistanceListingId || item.programNumber || "N/A",
+        title: item.title || item.programTitle || "Untitled",
+        agency: item.organizationName || item.department || "Unknown",
+        link: item.assistanceListingId ? `https://sam.gov/fal/${item.assistanceListingId}/view` : "",
+        postedDate: item.publishedDate || "",
+        closeDate: item.archiveDate || "",
+        type: "Federal Assistance Listing",
       }));
 
       return new Response(JSON.stringify({ results }), {
