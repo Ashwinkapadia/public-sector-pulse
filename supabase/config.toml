@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.push-to-clay]
 verify_jwt = false
+
+[functions.discovery-search]
+verify_jwt = false
