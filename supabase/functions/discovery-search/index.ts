@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { action, startDate, endDate, aln } = await req.json();
+    const { action, startDate, endDate, aln, alnPrefixes } = await req.json();
 
     if (action === "discover") {
       // SAM.gov opportunity search
@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       }
 
       // Use the Assistance Listings API for grants with ALN/CFDA numbers
-      const url = `https://api.sam.gov/assistance-listings/v1/search?api_key=${samApiKey}&publishedDateFrom=${startDate}&publishedDateTo=${endDate}&limit=50`;
+      const url = `https://api.sam.gov/assistance-listings/v1/search?api_key=${samApiKey}&publishedDateFrom=${startDate}&publishedDateTo=${endDate}&limit=100`;
 
       console.log("SAM.gov Assistance Listings request:", url.replace(samApiKey, "***"));
 
@@ -65,11 +65,10 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      console.log("SAM.gov response keys:", JSON.stringify(Object.keys(data)));
 
       // The API returns assistanceListingsData array
       const listings = data.assistanceListingsData || data.results || [];
-      const results = (Array.isArray(listings) ? listings : []).map((item: any) => ({
+      let results = (Array.isArray(listings) ? listings : []).map((item: any) => ({
         aln: item.assistanceListingId || item.programNumber || "N/A",
         title: item.title || item.programTitle || "Untitled",
         agency: item.organizationName || item.department || "Unknown",
@@ -78,6 +77,16 @@ Deno.serve(async (req) => {
         closeDate: item.archiveDate || "",
         type: "Federal Assistance Listing",
       }));
+
+      // Filter by ALN prefixes if provided (vertical filtering)
+      if (alnPrefixes && Array.isArray(alnPrefixes) && alnPrefixes.length > 0) {
+        results = results.filter((r: any) => {
+          if (r.aln === "N/A") return false;
+          const prefix = r.aln.split(".")[0];
+          return alnPrefixes.includes(prefix);
+        });
+        console.log(`Filtered by ALN prefixes [${alnPrefixes.join(",")}]: ${results.length} results`);
+      }
 
       return new Response(JSON.stringify({ results }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
