@@ -11,6 +11,10 @@ import {
   type NSFAward,
 } from "@/lib/discoveryService";
 import {
+  VERTICAL_MAPPINGS,
+  getAlnPrefixesForVerticals,
+} from "@/lib/verticalMappings";
+import {
   Table,
   TableBody,
   TableCell,
@@ -19,19 +23,30 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Search,
   ExternalLink,
   FlaskConical,
   GraduationCap,
   Loader2,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
+
+const VERTICAL_OPTIONS = Object.keys(VERTICAL_MAPPINGS);
 
 export function MoneyTrailDiscovery() {
   const [startDate, setStartDate] = useState(
     format(new Date(Date.now() - 30 * 86400000), "yyyy-MM-dd")
   );
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [selectedVertical, setSelectedVertical] = useState<string>("all");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<DiscoveredGrant[]>([]);
   const [trackingAln, setTrackingAln] = useState<string | null>(null);
@@ -45,13 +60,28 @@ export function MoneyTrailDiscovery() {
     setResults([]);
     setActiveTrail(null);
     try {
-      const data = await PulseDiscoveryService.discoverNewALNs(startDate, endDate);
+      const prefixes =
+        selectedVertical !== "all"
+          ? getAlnPrefixesForVerticals([selectedVertical])
+          : undefined;
+      const data = await PulseDiscoveryService.discoverNewALNs(
+        startDate,
+        endDate,
+        prefixes
+      );
       setResults(data);
       if (data.length === 0) {
-        toast({ title: "No Results", description: "No new grant opportunities found in this date range." });
+        toast({
+          title: "No Results",
+          description: "No grant opportunities found for this search.",
+        });
       }
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Discovery Failed", description: err.message });
+      toast({
+        variant: "destructive",
+        title: "Discovery Failed",
+        description: err.message,
+      });
     } finally {
       setLoading(false);
     }
@@ -59,7 +89,11 @@ export function MoneyTrailDiscovery() {
 
   const handleTrackMoney = async (aln: string) => {
     if (aln === "N/A" || !aln) {
-      toast({ variant: "destructive", title: "No ALN", description: "This opportunity doesn't have an ALN number to track." });
+      toast({
+        variant: "destructive",
+        title: "No ALN",
+        description: "This opportunity doesn't have an ALN number to track.",
+      });
       return;
     }
     setTrackingAln(aln);
@@ -75,7 +109,11 @@ export function MoneyTrailDiscovery() {
       setNihResults(nih);
       setNsfResults(nsf);
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Tracking Failed", description: err.message });
+      toast({
+        variant: "destructive",
+        title: "Tracking Failed",
+        description: err.message,
+      });
     } finally {
       setTrackingAln(null);
     }
@@ -94,7 +132,9 @@ export function MoneyTrailDiscovery() {
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">
             <div>
-              <label className="text-sm font-medium mb-1 block">Start Date</label>
+              <label className="text-sm font-medium mb-1 block">
+                Start Date
+              </label>
               <Input
                 type="date"
                 value={startDate}
@@ -111,11 +151,60 @@ export function MoneyTrailDiscovery() {
                 className="w-44"
               />
             </div>
-            <Button onClick={handleDiscover} disabled={loading} className="gap-2">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            <div>
+              <label className="text-sm font-medium mb-1 block">
+                Vertical
+              </label>
+              <Select
+                value={selectedVertical}
+                onValueChange={setSelectedVertical}
+              >
+                <SelectTrigger className="w-52">
+                  <SelectValue placeholder="All Verticals" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Verticals</SelectItem>
+                  {VERTICAL_OPTIONS.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleDiscover}
+              disabled={loading}
+              className="gap-2"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
               {loading ? "Searching..." : "Hunt for Grants"}
             </Button>
           </div>
+          {selectedVertical !== "all" && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                Filtering ALN prefixes:
+              </span>
+              {getAlnPrefixesForVerticals([selectedVertical]).map((p) => (
+                <Badge key={p} variant="outline" className="text-xs">
+                  {p}.xxx
+                </Badge>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2"
+                onClick={() => setSelectedVertical("all")}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -125,6 +214,11 @@ export function MoneyTrailDiscovery() {
           <CardHeader>
             <CardTitle>
               {results.length} Grant Opportunities Found
+              {selectedVertical !== "all" && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedVertical}
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -151,16 +245,18 @@ export function MoneyTrailDiscovery() {
                       {grant.agency}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {grant.postedDate}
+                      {grant.postedDate
+                        ? format(new Date(grant.postedDate), "MM/dd/yyyy")
+                        : ""}
                     </TableCell>
                     <TableCell className="text-right space-x-2">
                       {grant.link && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          asChild
-                        >
-                          <a href={grant.link} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" size="sm" asChild>
+                          <a
+                            href={grant.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             <ExternalLink className="h-4 w-4" />
                           </a>
                         </Button>
@@ -205,18 +301,23 @@ export function MoneyTrailDiscovery() {
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading...
                 </div>
               ) : nihResults.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No NIH projects found for this ALN.</p>
+                <p className="text-sm text-muted-foreground">
+                  No NIH projects found for this ALN.
+                </p>
               ) : (
                 <div className="space-y-3">
                   {nihResults.slice(0, 5).map((proj, i) => (
                     <div key={i} className="border rounded-md p-3 space-y-1">
-                      <p className="font-medium text-sm">{proj.project_title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        PI: {proj.contact_pi_name} • {proj.organization?.org_name}
+                      <p className="font-medium text-sm">
+                        {proj.project_title}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {proj.organization?.org_city}, {proj.organization?.org_state} •
-                        FY{proj.fiscal_year} •{" "}
+                        PI: {proj.contact_pi_name} •{" "}
+                        {proj.organization?.org_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {proj.organization?.org_city},{" "}
+                        {proj.organization?.org_state} • FY{proj.fiscal_year} •{" "}
                         {proj.award_amount
                           ? `$${proj.award_amount.toLocaleString()}`
                           : "N/A"}
@@ -242,16 +343,22 @@ export function MoneyTrailDiscovery() {
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading...
                 </div>
               ) : nsfResults.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No NSF awards found for this ALN.</p>
+                <p className="text-sm text-muted-foreground">
+                  No NSF awards found for this ALN.
+                </p>
               ) : (
                 <div className="space-y-3">
                   {nsfResults.slice(0, 5).map((award, i) => (
                     <div key={i} className="border rounded-md p-3 space-y-1">
-                      <p className="font-medium text-sm">{award.title || award.awardeeName}</p>
+                      <p className="font-medium text-sm">
+                        {award.title || award.awardeeName}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {award.awardeeName} •{" "}
                         {award.fundsObligatedAmt
-                          ? `$${Number(award.fundsObligatedAmt).toLocaleString()}`
+                          ? `$${Number(
+                              award.fundsObligatedAmt
+                            ).toLocaleString()}`
                           : "N/A"}
                       </p>
                       <p className="text-xs text-muted-foreground">
