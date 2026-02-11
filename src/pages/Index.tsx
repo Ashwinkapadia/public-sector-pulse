@@ -19,6 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { VerticalsFilter } from "@/components/VerticalsFilter";
 import { FetchProgress } from "@/components/FetchProgress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MoneyTrailDiscovery } from "@/components/MoneyTrailDiscovery";
 import { format } from "date-fns";
 
 const Index = () => {
@@ -624,226 +626,239 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
-        {/* Action Buttons */}
-        <section className="mb-6">
-          <div className="flex gap-3 justify-end">
-            <Button
-              onClick={handleClearFilters}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Clear Filters
-            </Button>
-            <Button
-              onClick={() => navigate("/subawards")}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <FileText className="h-4 w-4" />
-              View Subawards
-            </Button>
-            <Button
-              onClick={() => navigate("/sub-awards")}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <Search className="h-4 w-4" />
-              Sub-Award Intelligence
-            </Button>
-            <Button
-              onClick={handleClearData}
-              variant="destructive"
-              size="sm"
-              className="gap-2"
-            >
-              <Trash2 className="h-4 w-4" />
-              Clear All Data
-            </Button>
-            <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Save className="h-4 w-4" />
-                  Save Search
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Save Current Search</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 pt-4">
-                  <Input
-                    placeholder="Enter search name..."
-                    value={searchName}
-                    onChange={(e) => setSearchName(e.target.value)}
-                  />
-                  <Button onClick={handleSaveSearch} className="w-full">
-                    Save
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </section>
+        <Tabs defaultValue="dashboard" className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="dashboard">Prime Awards Dashboard</TabsTrigger>
+            <TabsTrigger value="money-trail">💰 Money Trail Discovery</TabsTrigger>
+          </TabsList>
 
-        {/* Filters Section */}
-        <section className="mb-8">
-          <div className="bg-card rounded-lg border p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-foreground">
-                Filter Data
-              </h2>
-              {savedSearches && savedSearches.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <Select onValueChange={handleLoadSearch}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Load saved search" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {savedSearches.map((search) => (
-                        <SelectItem key={search.id} value={search.id}>
-                          {search.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  Select State
-                </label>
-                <StateSelector
-                  value={selectedState}
-                  onChange={setSelectedState}
-                />
-              </div>
-              <DateRangeSlider
-                startDate={startDate}
-                endDate={endDate}
-                onStartDateChange={setStartDate}
-                onEndDateChange={setEndDate}
-              />
-            </div>
-
-            {/* Debug: show what the UI thinks the filters are */}
-            <div className="mt-4 text-xs text-muted-foreground">
-              Active filters: state={selectedState || "(none)"} • start=
-              {startDate ? format(startDate, "yyyy-MM-dd") : "(none)"} • end=
-              {endDate ? format(endDate, "yyyy-MM-dd") : "(none)"} • verticals=
-              {selectedVerticals.length}
-            </div>
-
-            <div className="mt-6">
-              <VerticalsFilter
-                selectedVerticals={selectedVerticals}
-                onSelectVerticals={setSelectedVerticals}
-              />
-            </div>
-            {/* Prime Awards Fetch Section */}
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Prime Awards</h3>
-              <div className="flex gap-3 flex-wrap">
+          <TabsContent value="dashboard">
+            {/* Action Buttons */}
+            <section className="mb-6">
+              <div className="flex gap-3 justify-end">
                 <Button
-                  onClick={handleFetchUSASpendingData}
-                  disabled={fetching || !selectedState}
-                  className="gap-2"
-                  size="lg"
-                >
-                  <RefreshCw className={`h-4 w-4 ${fetching ? "animate-spin" : ""}`} />
-                  {fetching ? "Fetching..." : "Fetch Prime Awards (USAspending)"}
-                </Button>
-                <Button
-                  onClick={handleFetchGrantsData}
-                  disabled={fetchingGrants || !selectedState}
-                  className="gap-2"
-                  size="lg"
-                  variant="secondary"
-                >
-                  <RefreshCw className={`h-4 w-4 ${fetchingGrants ? "animate-spin" : ""}`} />
-                  {fetchingGrants ? "Fetching..." : "Fetch Grants.gov"}
-                </Button>
-                <Button
-                  onClick={handleFetchNASBOData}
-                  disabled={fetchingNASBO || !selectedState}
-                  className="gap-2"
-                  size="lg"
+                  onClick={handleClearFilters}
                   variant="outline"
-                >
-                  <RefreshCw className={`h-4 w-4 ${fetchingNASBO ? "animate-spin" : ""}`} />
-                  {fetchingNASBO ? "Fetching..." : "Fetch NASBO Data"}
-                </Button>
-              </div>
-            </div>
-
-            {/* Subawards Fetch Section */}
-            <div className="mt-6 pt-6 border-t">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Subawards</h3>
-              <div className="flex gap-3 flex-wrap">
-                <Button
-                  onClick={handleFetchSubawardsData}
-                  disabled={fetchingSubawards || !selectedState}
+                  size="sm"
                   className="gap-2"
-                  size="lg"
-                  variant="secondary"
                 >
-                  <RefreshCw className={`h-4 w-4 ${fetchingSubawards ? "animate-spin" : ""}`} />
-                  {fetchingSubawards ? "Fetching..." : "Fetch Subawards (USAspending)"}
+                  <RefreshCw className="h-4 w-4" />
+                  Clear Filters
                 </Button>
-                <p className="text-sm text-muted-foreground self-center">
-                  Requires prime awards to be fetched first
-                </p>
+                <Button
+                  onClick={() => navigate("/subawards")}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  View Subawards
+                </Button>
+                <Button
+                  onClick={() => navigate("/sub-awards")}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Search className="h-4 w-4" />
+                  Sub-Award Intelligence
+                </Button>
+                <Button
+                  onClick={handleClearData}
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Clear All Data
+                </Button>
+                <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Save className="h-4 w-4" />
+                      Save Search
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Save Current Search</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <Input
+                        placeholder="Enter search name..."
+                        value={searchName}
+                        onChange={(e) => setSearchName(e.target.value)}
+                      />
+                      <Button onClick={handleSaveSearch} className="w-full">
+                        Save
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
-            </div>
-          </div>
-        </section>
+            </section>
 
-        {/* Prime Awards Fetch Progress */}
-        {fetchSessionId && (
-          <section className="mb-8">
-            <FetchProgress sessionId={fetchSessionId} onComplete={handleFetchComplete} />
-          </section>
-        )}
+            {/* Filters Section */}
+            <section className="mb-8">
+              <div className="bg-card rounded-lg border p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Filter Data
+                  </h2>
+                  {savedSearches && savedSearches.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <Select onValueChange={handleLoadSearch}>
+                        <SelectTrigger className="w-[200px]">
+                          <SelectValue placeholder="Load saved search" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {savedSearches.map((search) => (
+                            <SelectItem key={search.id} value={search.id}>
+                              {search.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Select State
+                    </label>
+                    <StateSelector
+                      value={selectedState}
+                      onChange={setSelectedState}
+                    />
+                  </div>
+                  <DateRangeSlider
+                    startDate={startDate}
+                    endDate={endDate}
+                    onStartDateChange={setStartDate}
+                    onEndDateChange={setEndDate}
+                  />
+                </div>
 
-        {/* Subawards Fetch Progress */}
-        {subawardsFetchSessionId && (
-          <section className="mb-8">
-            <FetchProgress sessionId={subawardsFetchSessionId} onComplete={handleSubawardsFetchComplete} />
-          </section>
-        )}
+                {/* Debug: show what the UI thinks the filters are */}
+                <div className="mt-4 text-xs text-muted-foreground">
+                  Active filters: state={selectedState || "(none)"} • start=
+                  {startDate ? format(startDate, "yyyy-MM-dd") : "(none)"} • end=
+                  {endDate ? format(endDate, "yyyy-MM-dd") : "(none)"} • verticals=
+                  {selectedVerticals.length}
+                </div>
 
-        {/* Metrics Overview */}
-        <section className="mb-8">
-          <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} />
-        </section>
+                <div className="mt-6">
+                  <VerticalsFilter
+                    selectedVerticals={selectedVerticals}
+                    onSelectVerticals={setSelectedVerticals}
+                  />
+                </div>
+                {/* Prime Awards Fetch Section */}
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Prime Awards</h3>
+                  <div className="flex gap-3 flex-wrap">
+                    <Button
+                      onClick={handleFetchUSASpendingData}
+                      disabled={fetching || !selectedState}
+                      className="gap-2"
+                      size="lg"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${fetching ? "animate-spin" : ""}`} />
+                      {fetching ? "Fetching..." : "Fetch Prime Awards (USAspending)"}
+                    </Button>
+                    <Button
+                      onClick={handleFetchGrantsData}
+                      disabled={fetchingGrants || !selectedState}
+                      className="gap-2"
+                      size="lg"
+                      variant="secondary"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${fetchingGrants ? "animate-spin" : ""}`} />
+                      {fetchingGrants ? "Fetching..." : "Fetch Grants.gov"}
+                    </Button>
+                    <Button
+                      onClick={handleFetchNASBOData}
+                      disabled={fetchingNASBO || !selectedState}
+                      className="gap-2"
+                      size="lg"
+                      variant="outline"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${fetchingNASBO ? "animate-spin" : ""}`} />
+                      {fetchingNASBO ? "Fetching..." : "Fetch NASBO Data"}
+                    </Button>
+                  </div>
+                </div>
 
-        {/* Funding Chart */}
-        <section className="mb-8">
-          <FundingChart state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} />
-        </section>
+                {/* Subawards Fetch Section */}
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Subawards</h3>
+                  <div className="flex gap-3 flex-wrap">
+                    <Button
+                      onClick={handleFetchSubawardsData}
+                      disabled={fetchingSubawards || !selectedState}
+                      className="gap-2"
+                      size="lg"
+                      variant="secondary"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${fetchingSubawards ? "animate-spin" : ""}`} />
+                      {fetchingSubawards ? "Fetching..." : "Fetch Subawards (USAspending)"}
+                    </Button>
+                    <p className="text-sm text-muted-foreground self-center">
+                      Requires prime awards to be fetched first
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-        {/* Prime Awards Table */}
-        <section className="mb-8">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Prime Awards</h2>
-          <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} />
-        </section>
+            {/* Prime Awards Fetch Progress */}
+            {fetchSessionId && (
+              <section className="mb-8">
+                <FetchProgress sessionId={fetchSessionId} onComplete={handleFetchComplete} />
+              </section>
+            )}
 
-        {/* Subawards Table */}
-        <section className="mb-8">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Subawards</h2>
-          <SubawardsTable state={selectedState} startDate={startDate} endDate={endDate} />
-        </section>
+            {/* Subawards Fetch Progress */}
+            {subawardsFetchSessionId && (
+              <section className="mb-8">
+                <FetchProgress sessionId={subawardsFetchSessionId} onComplete={handleSubawardsFetchComplete} />
+              </section>
+            )}
 
-        {/* Data Sources */}
-        <section>
-          <DataSources />
-        </section>
+            {/* Metrics Overview */}
+            <section className="mb-8">
+              <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} />
+            </section>
+
+            {/* Funding Chart */}
+            <section className="mb-8">
+              <FundingChart state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} />
+            </section>
+
+            {/* Prime Awards Table */}
+            <section className="mb-8">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Prime Awards</h2>
+              <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} />
+            </section>
+
+            {/* Subawards Table */}
+            <section className="mb-8">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Subawards</h2>
+              <SubawardsTable state={selectedState} startDate={startDate} endDate={endDate} />
+            </section>
+
+            {/* Data Sources */}
+            <section>
+              <DataSources />
+            </section>
+          </TabsContent>
+
+          <TabsContent value="money-trail">
+            <MoneyTrailDiscovery />
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Footer */}
