@@ -150,22 +150,11 @@ const Index = () => {
     };
   }, [navigate]);
 
-  // Hard-reset cache when filters change to prevent stale data from appearing.
-  // We remove old cached entries entirely, then let the hooks refetch fresh data.
+  // Invalidate cache when filters change so hooks refetch with new parameters.
   useEffect(() => {
     if (loading) return;
 
-    // Debounce slightly so picking dates doesn't spam requests.
     const t = window.setTimeout(() => {
-      // Cancel in-flight requests so old responses can't overwrite the UI.
-      queryClient.cancelQueries({ queryKey: ["funding_records"], exact: false });
-      queryClient.cancelQueries({ queryKey: ["funding_metrics"], exact: false });
-
-      // CRITICAL: Remove all cached data for these queries so we never show stale rows.
-      queryClient.removeQueries({ queryKey: ["funding_records"], exact: false });
-      queryClient.removeQueries({ queryKey: ["funding_metrics"], exact: false });
-
-      // Let the hooks refetch via their observers
       queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
     }, 200);
@@ -284,52 +273,30 @@ const Index = () => {
     setFetchSessionId(null);
     setFetching(false);
 
-    console.debug("handleFetchComplete: start", {
-      selectedState,
-      startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString(),
-      selectedVerticalsCount: selectedVerticals.length,
-    });
+    console.debug("handleFetchComplete: refreshing dashboard data");
 
-    // HARD-RESET cache before refetch to ensure NO stale rows appear
-    queryClient.removeQueries({ queryKey: ["organizations"], exact: false });
-    queryClient.removeQueries({ queryKey: ["funding_records"], exact: false });
-    queryClient.removeQueries({ queryKey: ["funding_metrics"], exact: false });
+    // Use invalidateQueries instead of removeQueries to preserve active observers.
+    // removeQueries destroys the query entirely, so refetchQueries has nothing to target.
+    // invalidateQueries marks data as stale and triggers active hook observers to refetch.
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["organizations"], exact: false }),
+      queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false }),
+      queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false }),
+    ]);
+    console.debug("handleFetchComplete: initial invalidation done");
 
-    // Invalidate and refetch
-    queryClient.invalidateQueries({ queryKey: ["organizations"], exact: false });
-    queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
-    queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
-
-    // Ensure queries refetch immediately. Use type:"all" so we don't miss cases where the
-    // query is considered inactive at the moment the completion event arrives.
-    try {
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: ["funding_records"], exact: false, type: "all" }),
-        queryClient.refetchQueries({ queryKey: ["funding_metrics"], exact: false, type: "all" }),
-      ]);
-      console.debug("handleFetchComplete: initial refetch done");
-    } catch (err) {
-      console.warn("handleFetchComplete: initial refetch failed", err);
-    }
-
-    // Defensive: ingestion completion/status write can race the final inserts; refetch once more shortly after
+    // Defensive: edge function may still be writing final rows; invalidate once more after a short delay
     window.setTimeout(() => {
-      queryClient.removeQueries({ queryKey: ["funding_records"], exact: false });
-      queryClient.removeQueries({ queryKey: ["funding_metrics"], exact: false });
-      Promise.all([
-        queryClient.refetchQueries({ queryKey: ["funding_records"], exact: false, type: "all" }),
-        queryClient.refetchQueries({ queryKey: ["funding_metrics"], exact: false, type: "all" }),
-      ])
-        .then(() => console.debug("handleFetchComplete: delayed refetch done"))
-        .catch((err) => console.warn("handleFetchComplete: delayed refetch failed", err));
-    }, 1500);
+      queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
+      console.debug("handleFetchComplete: delayed invalidation done");
+    }, 2000);
 
     toast({
       title: "Prime Awards Fetch Complete",
       description: "Dashboard updated with new prime award data",
     });
-  }, [queryClient, toast, selectedState, startDate, endDate, selectedVerticals.length]);
+  }, [queryClient, toast]);
 
   const handleFetchSubawardsData = async () => {
     if (isAdmin === false) {
