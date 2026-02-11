@@ -10,22 +10,37 @@ export interface DiscoveredGrant {
   type: string;
 }
 
-export interface NIHProject {
-  project_title: string;
-  contact_pi_name: string;
-  organization: { org_name: string; org_city: string; org_state: string };
-  award_amount: number;
-  fiscal_year: number;
-  project_num: string;
+export interface GrantsGovOpportunity {
+  id: string;
+  number: string;
+  title: string;
+  agency: string;
+  openDate: string;
+  closeDate: string;
+  status: string;
+  alnList: string;
+  link: string;
 }
 
-export interface NSFAward {
-  id: string;
-  awardeeName: string;
-  fundsObligatedAmt: string;
-  title: string;
+export interface PrimeAward {
+  awardId: string;
+  recipientName: string;
+  amount: number;
+  agency: string;
+  subAgency: string;
   startDate: string;
-  expDate: string;
+  endDate: string;
+  description: string;
+}
+
+export interface SubAward {
+  subAwardId: string;
+  subAwardeeName: string;
+  amount: number;
+  primeAwardId: string;
+  primeRecipientName: string;
+  date: string;
+  description: string;
 }
 
 const invokeDiscovery = async (body: Record<string, unknown>) => {
@@ -51,13 +66,18 @@ export const PulseDiscoveryService = {
     return data.results || [];
   },
 
-  async trackNIH(aln: string): Promise<NIHProject[]> {
-    const data = await invokeDiscovery({ action: "track_nih", aln });
+  async trackGrantsGov(aln: string): Promise<GrantsGovOpportunity[]> {
+    const data = await invokeDiscovery({ action: "track_grants_gov", aln });
     return data.results || [];
   },
 
-  async trackNSF(aln: string): Promise<NSFAward[]> {
-    const data = await invokeDiscovery({ action: "track_nsf", aln });
-    return data.results || [];
+  async trackPrimeAwards(aln: string, startDate?: string, endDate?: string): Promise<{ results: PrimeAward[]; totalCount: number }> {
+    const data = await invokeDiscovery({ action: "track_prime", aln, startDate, endDate });
+    return { results: data.results || [], totalCount: data.totalCount || 0 };
+  },
+
+  async trackSubAwards(aln: string, startDate?: string, endDate?: string): Promise<{ results: SubAward[]; totalCount: number }> {
+    const data = await invokeDiscovery({ action: "track_sub", aln, startDate, endDate });
+    return { results: data.results || [], totalCount: data.totalCount || 0 };
   },
 };
