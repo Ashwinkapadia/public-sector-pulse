@@ -117,14 +117,31 @@ Deno.serve(async (req) => {
       }
 
       // Grants.gov search2 API - no auth required
+      // Build Grants.gov search payload with date filtering
+      const grantsPayload: any = {
+        rows: 25,
+        aln: aln,
+        oppStatuses: "forecasted|posted",
+        sortBy: "openDate|desc",
+      };
+
+      // Use the user's date range to filter — only show recent opportunities
+      if (startDate) {
+        // Grants.gov expects MM/DD/YYYY format
+        const sd = new Date(startDate);
+        grantsPayload.postedFrom = `${String(sd.getMonth() + 1).padStart(2, "0")}/${String(sd.getDate()).padStart(2, "0")}/${sd.getFullYear()}`;
+      }
+      if (endDate) {
+        const ed = new Date(endDate);
+        grantsPayload.postedTo = `${String(ed.getMonth() + 1).padStart(2, "0")}/${String(ed.getDate()).padStart(2, "0")}/${ed.getFullYear()}`;
+      }
+
+      console.log("Grants.gov search payload:", JSON.stringify(grantsPayload));
+
       const response = await fetch("https://api.grants.gov/v1/api/search2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rows: 25,
-          aln: aln,
-          oppStatuses: "forecasted|posted",
-        }),
+        body: JSON.stringify(grantsPayload),
       });
 
       if (!response.ok) {

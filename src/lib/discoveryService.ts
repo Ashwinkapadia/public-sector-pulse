@@ -66,8 +66,8 @@ export const PulseDiscoveryService = {
     return { results: data.results || [], totalBeforeFilter: data.totalBeforeFilter };
   },
 
-  async trackGrantsGov(aln: string): Promise<GrantsGovOpportunity[]> {
-    const data = await invokeDiscovery({ action: "track_grants_gov", aln });
+  async trackGrantsGov(aln: string, startDate?: string, endDate?: string): Promise<GrantsGovOpportunity[]> {
+    const data = await invokeDiscovery({ action: "track_grants_gov", aln, startDate, endDate });
     return data.results || [];
   },
 

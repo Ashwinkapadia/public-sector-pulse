@@ -91,7 +91,7 @@ export function MoneyTrailDiscovery() {
 
     try {
       const [grantsGov, prime, sub] = await Promise.all([
-        PulseDiscoveryService.trackGrantsGov(aln),
+        PulseDiscoveryService.trackGrantsGov(aln, startDate, endDate),
         PulseDiscoveryService.trackPrimeAwards(aln, startDate, endDate),
         PulseDiscoveryService.trackSubAwards(aln, startDate, endDate),
       ]);
