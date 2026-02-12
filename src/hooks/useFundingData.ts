@@ -106,49 +106,68 @@ export function useFundingRecords(
     enabled: hasFilters,
     queryFn: async () => {
       console.log("[useFundingRecords] Fetching", { state, startKey, endKey, verticalsKey });
-      // Build the main query - include source field explicitly
-      let query = supabase
-        .from("funding_records")
-        .select(`
-          id,
-          organization_id,
-          vertical_id,
-          amount,
-          status,
-          fiscal_year,
-          date_range_start,
-          date_range_end,
-          notes,
-          grant_type_id,
-          cfda_code,
-          source,
-          action_date,
-          organizations!inner (*),
-          verticals (*),
-          grant_types (*)
-        `)
-        .order("created_at", { ascending: false });
 
-      // Filter by state via inner join (prevents huge `in()` lists and guarantees state is applied)
-      if (state && state !== "ALL") {
-        query = query.eq("organizations.state", state);
+      // Supabase defaults to 1000 rows max. We need to fetch ALL matching records
+      // by paginating through the results.
+      const PAGE_SIZE = 1000;
+      let allData: FundingRecord[] = [];
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        let query = supabase
+          .from("funding_records")
+          .select(`
+            id,
+            organization_id,
+            vertical_id,
+            amount,
+            status,
+            fiscal_year,
+            date_range_start,
+            date_range_end,
+            notes,
+            grant_type_id,
+            cfda_code,
+            source,
+            action_date,
+            organizations!inner (*),
+            verticals (*),
+            grant_types (*)
+          `)
+          .order("created_at", { ascending: false })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        // Filter by state via inner join
+        if (state && state !== "ALL") {
+          query = query.eq("organizations.state", state);
+        }
+
+        // Filter by action_date
+        const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
+        if (dateOrFilter) query = query.or(dateOrFilter);
+
+        // Filter by verticals
+        if (verticalIds && verticalIds.length > 0) {
+          query = query.in("vertical_id", verticalIds);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const rows = (data || []) as FundingRecord[];
+        allData = allData.concat(rows);
+
+        // If we got fewer than PAGE_SIZE rows, we've reached the end
+        hasMore = rows.length === PAGE_SIZE;
+        page++;
+
+        // Safety cap to prevent infinite loops
+        if (page > 20) break;
       }
 
-      // Filter by action_date (when grant was awarded)
-      // IMPORTANT: build a single OR filter string so we don't override conditions.
-      // This handles both USAspending (has action_date) and Grants.gov/legacy records.
-      const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
-      console.log("[useFundingRecords] dateOrFilter:", dateOrFilter);
-      if (dateOrFilter) query = query.or(dateOrFilter);
-
-      // Filter by verticals (server-side) when specified
-      if (verticalIds && verticalIds.length > 0) {
-        query = query.in("vertical_id", verticalIds);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as FundingRecord[];
+      console.log(`[useFundingRecords] Total records fetched: ${allData.length} across ${page} pages`);
+      return allData;
     },
   });
 }
@@ -174,26 +193,39 @@ export function useFundingMetrics(
     enabled: hasFilters,
     queryFn: async () => {
       console.log("[useFundingMetrics] Fetching", { state, startKey, endKey, verticalsKey });
-      // Get funding data with date filters. Filter by state via inner join so state is always enforced.
-      let fundingQuery = supabase
-        .from("funding_records")
-        .select("organization_id, amount, vertical_id, organizations!inner(state)");
 
-      if (state && state !== "ALL") {
-        fundingQuery = fundingQuery.eq("organizations.state", state);
+      // Paginate to get ALL records (same issue as useFundingRecords)
+      const PAGE_SIZE = 1000;
+      let allData: any[] = [];
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        let fundingQuery = supabase
+          .from("funding_records")
+          .select("organization_id, amount, vertical_id, organizations!inner(state)")
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (state && state !== "ALL") {
+          fundingQuery = fundingQuery.eq("organizations.state", state);
+        }
+
+        const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
+        if (dateOrFilter) fundingQuery = fundingQuery.or(dateOrFilter);
+
+        if (verticalIds && verticalIds.length > 0) {
+          fundingQuery = fundingQuery.in("vertical_id", verticalIds);
+        }
+
+        const { data } = await fundingQuery;
+        const rows = data || [];
+        allData = allData.concat(rows);
+        hasMore = rows.length === PAGE_SIZE;
+        page++;
+        if (page > 20) break;
       }
 
-      // Filter by action_date (when grant was awarded) with fallback to date_range_start
-      const dateOrFilter = buildAwardDateOrFilter({ start: startDate, end: endDate });
-      console.log("[useFundingMetrics] dateOrFilter:", dateOrFilter);
-      if (dateOrFilter) fundingQuery = fundingQuery.or(dateOrFilter);
-
-      // Filter by verticals if specified
-      if (verticalIds && verticalIds.length > 0) {
-        fundingQuery = fundingQuery.in("vertical_id", verticalIds);
-      }
-
-      const { data: fundingData } = await fundingQuery;
+      const fundingData = allData;
 
       console.log('Funding Metrics Debug:', {
         state,
