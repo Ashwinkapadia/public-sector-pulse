@@ -36,6 +36,11 @@ interface TrailData {
   sub: { results: SubAward[]; totalCount: number };
 }
 
+interface DiscoverResult {
+  results: DiscoveredGrant[];
+  totalBeforeFilter?: number;
+}
+
 export function MoneyTrailDiscovery() {
   const [startDate, setStartDate] = useState(
     format(new Date(Date.now() - 30 * 86400000), "yyyy-MM-dd")
@@ -44,6 +49,7 @@ export function MoneyTrailDiscovery() {
   const [selectedVertical, setSelectedVertical] = useState<string>("all");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<DiscoveredGrant[]>([]);
+  const [totalBeforeFilter, setTotalBeforeFilter] = useState<number | null>(null);
   const [trackingAln, setTrackingAln] = useState<string | null>(null);
   const [trail, setTrail] = useState<TrailData | null>(null);
   const { toast } = useToast();
@@ -52,6 +58,7 @@ export function MoneyTrailDiscovery() {
   const handleDiscover = async () => {
     setLoading(true);
     setResults([]);
+    setTotalBeforeFilter(null);
     setTrail(null);
     try {
       const prefixes =
@@ -59,9 +66,13 @@ export function MoneyTrailDiscovery() {
           ? getAlnPrefixesForVerticals([selectedVertical])
           : undefined;
       const data = await PulseDiscoveryService.discoverNewALNs(startDate, endDate, prefixes);
-      setResults(data);
-      if (data.length === 0) {
-        toast({ title: "No Results", description: "No grant opportunities found for this search." });
+      setResults(data.results);
+      setTotalBeforeFilter(data.totalBeforeFilter ?? null);
+      if (data.results.length === 0) {
+        const filterMsg = data.totalBeforeFilter && data.totalBeforeFilter > 0
+          ? `${data.totalBeforeFilter} total listings were found, but none matched the "${selectedVertical}" vertical filter. Try "All Verticals".`
+          : "No grant opportunities found for this search.";
+        toast({ title: "No Results", description: filterMsg });
       }
     } catch (err: any) {
       toast({ variant: "destructive", title: "Discovery Failed", description: err.message });

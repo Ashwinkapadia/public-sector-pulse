@@ -47,22 +47,41 @@ Deno.serve(async (req) => {
         });
       }
 
-      const url = `https://api.sam.gov/assistance-listings/v1/search?api_key=${samApiKey}&publishedDateFrom=${startDate}&publishedDateTo=${endDate}&limit=100`;
-      console.log("SAM.gov Assistance Listings request:", url.replace(samApiKey, "***"));
+      // Fetch multiple pages to get comprehensive results
+      const allListings: any[] = [];
+      const pageSize = 100;
+      const maxPages = 5; // Up to 500 results
+      
+      for (let page = 0; page < maxPages; page++) {
+        const offset = page * pageSize;
+        const url = `https://api.sam.gov/assistance-listings/v1/search?api_key=${samApiKey}&publishedDateFrom=${startDate}&publishedDateTo=${endDate}&limit=${pageSize}&offset=${offset}`;
+        if (page === 0) console.log("SAM.gov Assistance Listings request:", url.replace(samApiKey, "***"));
 
-      const response = await fetch(url);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("SAM.gov error:", errorText);
-        return new Response(JSON.stringify({ error: `SAM.gov API error: ${response.status}` }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const response = await fetch(url);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("SAM.gov error:", errorText);
+          if (page === 0) {
+            return new Response(JSON.stringify({ error: `SAM.gov API error: ${response.status}`, details: errorText }), {
+              status: 502,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          break; // Use what we have from previous pages
+        }
+
+        const data = await response.json();
+        const listings = data.assistanceListingsData || data.results || [];
+        const pageItems = Array.isArray(listings) ? listings : [];
+        allListings.push(...pageItems);
+        
+        // Stop if we got fewer than requested (no more pages)
+        if (pageItems.length < pageSize) break;
       }
+      
+      console.log(`SAM.gov total fetched: ${allListings.length} listings`);
 
-      const data = await response.json();
-      const listings = data.assistanceListingsData || data.results || [];
-      let results = (Array.isArray(listings) ? listings : []).map((item: any) => ({
+      let results = allListings.map((item: any) => ({
         aln: item.assistanceListingId || item.programNumber || "N/A",
         title: item.title || item.programTitle || "Untitled",
         agency: item.organizationName || item.department || "Unknown",
@@ -72,16 +91,18 @@ Deno.serve(async (req) => {
         type: "Federal Assistance Listing",
       }));
 
+      const totalBeforeFilter = results.length;
+
       if (alnPrefixes && Array.isArray(alnPrefixes) && alnPrefixes.length > 0) {
         results = results.filter((r: any) => {
           if (r.aln === "N/A") return false;
           const prefix = r.aln.split(".")[0];
           return alnPrefixes.includes(prefix);
         });
-        console.log(`Filtered by ALN prefixes [${alnPrefixes.join(",")}]: ${results.length} results`);
+        console.log(`Filtered by ALN prefixes [${alnPrefixes.join(",")}]: ${results.length} of ${totalBeforeFilter} results`);
       }
 
-      return new Response(JSON.stringify({ results }), {
+      return new Response(JSON.stringify({ results, totalBeforeFilter }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
