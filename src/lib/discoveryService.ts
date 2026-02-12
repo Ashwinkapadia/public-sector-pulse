@@ -57,13 +57,13 @@ const invokeDiscovery = async (body: Record<string, unknown>) => {
 };
 
 export const PulseDiscoveryService = {
-  async discoverNewALNs(startDate: string, endDate: string, alnPrefixes?: string[]): Promise<DiscoveredGrant[]> {
+  async discoverNewALNs(startDate: string, endDate: string, alnPrefixes?: string[]): Promise<{ results: DiscoveredGrant[]; totalBeforeFilter?: number }> {
     const body: Record<string, unknown> = { action: "discover", startDate, endDate };
     if (alnPrefixes && alnPrefixes.length > 0) {
       body.alnPrefixes = alnPrefixes;
     }
     const data = await invokeDiscovery(body);
-    return data.results || [];
+    return { results: data.results || [], totalBeforeFilter: data.totalBeforeFilter };
   },
 
   async trackGrantsGov(aln: string): Promise<GrantsGovOpportunity[]> {
