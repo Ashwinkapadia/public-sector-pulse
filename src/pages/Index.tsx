@@ -24,10 +24,21 @@ import { MoneyTrailDiscovery } from "@/components/MoneyTrailDiscovery";
 import { format } from "date-fns";
 
 const Index = () => {
-  const [selectedState, setSelectedState] = useState<string>();
-  const [startDate, setStartDate] = useState<Date>();
-  const [endDate, setEndDate] = useState<Date>();
-  const [selectedVerticals, setSelectedVerticals] = useState<string[]>([]);
+  const [selectedState, setSelectedState] = useState<string | undefined>(() => {
+    return localStorage.getItem("dashboard_state") || undefined;
+  });
+  const [startDate, setStartDate] = useState<Date | undefined>(() => {
+    const saved = localStorage.getItem("dashboard_startDate");
+    return saved ? new Date(saved) : undefined;
+  });
+  const [endDate, setEndDate] = useState<Date | undefined>(() => {
+    const saved = localStorage.getItem("dashboard_endDate");
+    return saved ? new Date(saved) : undefined;
+  });
+  const [selectedVerticals, setSelectedVerticals] = useState<string[]>(() => {
+    const saved = localStorage.getItem("dashboard_verticals");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -163,6 +174,17 @@ const Index = () => {
 
     return () => window.clearTimeout(t);
   }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals]);
+
+  // Persist filters to localStorage so they survive page refresh
+  useEffect(() => {
+    if (selectedState) localStorage.setItem("dashboard_state", selectedState);
+    else localStorage.removeItem("dashboard_state");
+    if (startDate) localStorage.setItem("dashboard_startDate", startDate.toISOString());
+    else localStorage.removeItem("dashboard_startDate");
+    if (endDate) localStorage.setItem("dashboard_endDate", endDate.toISOString());
+    else localStorage.removeItem("dashboard_endDate");
+    localStorage.setItem("dashboard_verticals", JSON.stringify(selectedVerticals));
+  }, [selectedState, startDate, endDate, selectedVerticals]);
 
   const invokeWithAuth = async <T = any>(
     functionName: string,
@@ -469,6 +491,10 @@ const Index = () => {
     setStartDate(undefined);
     setEndDate(undefined);
     setSelectedVerticals([]);
+    localStorage.removeItem("dashboard_state");
+    localStorage.removeItem("dashboard_startDate");
+    localStorage.removeItem("dashboard_endDate");
+    localStorage.removeItem("dashboard_verticals");
     toast({
       title: "Filters cleared",
       description: "All filters have been reset",
@@ -496,6 +522,10 @@ const Index = () => {
       setEndDate(undefined);
       setSelectedVerticals([]);
       setFetchSessionId(null);
+      localStorage.removeItem("dashboard_state");
+      localStorage.removeItem("dashboard_startDate");
+      localStorage.removeItem("dashboard_endDate");
+      localStorage.removeItem("dashboard_verticals");
 
       // HARD-RESET: Remove all cached funding/metrics/org data so stale rows cannot appear.
       queryClient.removeQueries({ queryKey: ["organizations"], exact: false });

@@ -49,8 +49,18 @@ export default function SubAwards() {
       const codes = alnList.split(",").map(c => c.trim()).filter(Boolean);
       const alnString = codes.join(",");
 
-      // Set the ALN field and trigger search with the value directly
+      // Set the ALN field
       formRef.current.setCfdaNumber(alnString);
+
+      // Also pick up dates and state from URL params
+      const urlState = searchParams.get("state");
+      const urlStartDate = searchParams.get("start_date");
+      const urlEndDate = searchParams.get("end_date");
+      if (urlState) formRef.current.setState(urlState);
+      if (urlStartDate) formRef.current.setStartDate(new Date(urlStartDate + "T00:00:00"));
+      if (urlEndDate) formRef.current.setEndDate(new Date(urlEndDate + "T00:00:00"));
+
+      // Trigger search with all the values
       formRef.current.triggerSearch(alnString);
       
       toast({
