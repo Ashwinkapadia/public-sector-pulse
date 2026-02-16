@@ -49,19 +49,29 @@ export default function SubAwards() {
       const codes = alnList.split(",").map(c => c.trim()).filter(Boolean);
       const alnString = codes.join(",");
 
-      // Set the ALN field
+      // Set the ALN field and UI state
       formRef.current.setCfdaNumber(alnString);
 
-      // Also pick up dates and state from URL params
+      // Pick up dates and state from URL params
       const urlState = searchParams.get("state");
       const urlStartDate = searchParams.get("start_date");
       const urlEndDate = searchParams.get("end_date");
+      
+      const parsedStartDate = urlStartDate ? new Date(urlStartDate + "T00:00:00") : undefined;
+      const parsedEndDate = urlEndDate ? new Date(urlEndDate + "T00:00:00") : undefined;
+      
+      // Update UI fields
       if (urlState) formRef.current.setState(urlState);
-      if (urlStartDate) formRef.current.setStartDate(new Date(urlStartDate + "T00:00:00"));
-      if (urlEndDate) formRef.current.setEndDate(new Date(urlEndDate + "T00:00:00"));
+      if (parsedStartDate) formRef.current.setStartDate(parsedStartDate);
+      if (parsedEndDate) formRef.current.setEndDate(parsedEndDate);
 
-      // Trigger search with all the values
-      formRef.current.triggerSearch(alnString);
+      // Trigger search with explicit overrides to avoid stale state
+      formRef.current.triggerSearch({
+        cfda: alnString,
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
+        state: urlState || undefined,
+      });
       
       toast({
         title: "Sub-Awards Loaded",
