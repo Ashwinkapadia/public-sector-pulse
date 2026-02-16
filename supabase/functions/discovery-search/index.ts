@@ -92,17 +92,23 @@ Deno.serve(async (req) => {
       }));
 
       const totalBeforeFilter = results.length;
+      let matchedCount = totalBeforeFilter;
 
+      // Instead of filtering out non-matching results (which often leaves 0),
+      // sort matching ALN prefixes to the top and tag them
       if (alnPrefixes && Array.isArray(alnPrefixes) && alnPrefixes.length > 0) {
-        results = results.filter((r: any) => {
-          if (r.aln === "N/A") return false;
-          const prefix = r.aln.split(".")[0];
-          return alnPrefixes.includes(prefix);
+        results = results.map((r: any) => {
+          const prefix = r.aln !== "N/A" ? r.aln.split(".")[0] : "";
+          const isMatch = alnPrefixes.includes(prefix);
+          return { ...r, verticalMatch: isMatch };
         });
-        console.log(`Filtered by ALN prefixes [${alnPrefixes.join(",")}]: ${results.length} of ${totalBeforeFilter} results`);
+        // Sort: matches first, then non-matches
+        results.sort((a: any, b: any) => (b.verticalMatch ? 1 : 0) - (a.verticalMatch ? 1 : 0));
+        matchedCount = results.filter((r: any) => r.verticalMatch).length;
+        console.log(`ALN prefix filter [${alnPrefixes.join(",")}]: ${matchedCount} matches of ${totalBeforeFilter} total`);
       }
 
-      return new Response(JSON.stringify({ results, totalBeforeFilter }), {
+      return new Response(JSON.stringify({ results, totalBeforeFilter, matchedCount }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

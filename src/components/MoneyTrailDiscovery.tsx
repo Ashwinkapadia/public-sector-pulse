@@ -43,7 +43,7 @@ interface DiscoverResult {
 
 export function MoneyTrailDiscovery() {
   const [startDate, setStartDate] = useState(
-    format(new Date(Date.now() - 30 * 86400000), "yyyy-MM-dd")
+    format(new Date(Date.now() - 180 * 86400000), "yyyy-MM-dd")
   );
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [selectedVertical, setSelectedVertical] = useState<string>("all");
@@ -69,10 +69,12 @@ export function MoneyTrailDiscovery() {
       setResults(data.results);
       setTotalBeforeFilter(data.totalBeforeFilter ?? null);
       if (data.results.length === 0) {
-        const filterMsg = data.totalBeforeFilter && data.totalBeforeFilter > 0
-          ? `${data.totalBeforeFilter} total listings were found, but none matched the "${selectedVertical}" vertical filter. Try "All Verticals".`
-          : "No grant opportunities found for this search.";
-        toast({ title: "No Results", description: filterMsg });
+        toast({ title: "No Results", description: "No grant opportunities found for this date range." });
+      } else if (selectedVertical !== "all") {
+        const matchCount = data.results.filter((r: any) => r.verticalMatch).length;
+        if (matchCount === 0) {
+          toast({ title: "No Exact Matches", description: `None of the ${data.results.length} listings matched "${selectedVertical}" (ALN prefix). All results are shown below — matching results would appear at the top.` });
+        }
       }
     } catch (err: any) {
       toast({ variant: "destructive", title: "Discovery Failed", description: err.message });
@@ -191,9 +193,9 @@ export function MoneyTrailDiscovery() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {results.map((grant, i) => (
-                  <TableRow key={i} className={trail?.aln === grant.aln ? "bg-muted/50" : ""}>
-                    <TableCell><Badge variant="secondary">{grant.aln}</Badge></TableCell>
+                  {results.map((grant: any, i) => (
+                    <TableRow key={i} className={trail?.aln === grant.aln ? "bg-muted/50" : grant.verticalMatch ? "bg-primary/5" : "opacity-60"}>
+                      <TableCell><Badge variant={grant.verticalMatch ? "default" : "secondary"}>{grant.aln}</Badge></TableCell>
                     <TableCell className="max-w-xs truncate font-medium">{grant.title}</TableCell>
                     <TableCell className="max-w-[200px] truncate text-muted-foreground">{grant.agency}</TableCell>
                     <TableCell className="text-muted-foreground">

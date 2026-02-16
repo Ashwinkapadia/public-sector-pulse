@@ -8,6 +8,7 @@ export interface DiscoveredGrant {
   postedDate: string;
   closeDate: string;
   type: string;
+  verticalMatch?: boolean;
 }
 
 export interface GrantsGovOpportunity {
