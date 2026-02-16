@@ -105,39 +105,26 @@ const Index = () => {
   useEffect(() => {
     let isMounted = true;
 
-    // Set up auth state listener FIRST (recommended by Supabase)
+    // Use ONLY onAuthStateChange — it fires with INITIAL_SESSION on mount
+    // and handles token refresh automatically. No separate getUser/getSession needed.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
+
+      console.log("[Auth] event:", event, "hasSession:", !!session);
 
       try {
         if (!session) {
           setIsAdmin(null);
-          navigate("/auth");
+          // Don't redirect on TOKEN_REFRESHED failures — only on explicit sign out or initial load
+          if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
+            navigate("/auth");
+          }
           return;
         }
 
-        // Pass user ID directly — avoids re-calling getSession which can hang during refresh
         await refreshAdminStatus(session.user.id);
       } catch (err) {
         console.error("Auth state handling failed:", err);
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    // Then check current session — use getUser() which is more reliable than getSession()
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!isMounted) return;
-
-      try {
-        if (!user) {
-          navigate("/auth");
-          return;
-        }
-
-        await refreshAdminStatus(user.id);
-      } catch (err) {
-        console.error("Initial session check failed:", err);
       } finally {
         setLoading(false);
       }
