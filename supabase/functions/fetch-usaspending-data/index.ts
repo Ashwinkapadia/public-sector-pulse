@@ -400,7 +400,7 @@ async function processData(
             "Awarding Sub Agency",
             "Start Date",
             "End Date",
-            "Base Obligation Date",
+            "Action Date",
             "Description",
             "CFDA Number",
             "Assistance Listings",
@@ -471,7 +471,7 @@ async function processData(
               "Awarding Sub Agency",
               "Start Date",
               "End Date",
-              "Base Obligation Date",
+              "Action Date",
               "Description",
               "CFDA Number",
               "Assistance Listings",
@@ -624,8 +624,8 @@ async function processData(
         const awardingAgency = result["Awarding Agency"] || "Unknown";
         const startDateStr = normalizeDateToYmd(result["Start Date"]);
         const endDateStr = normalizeDateToYmd(result["End Date"]);
-        // "Base Obligation Date" is the documented date field for when the obligation occurred
-        const actionDateStr = normalizeDateToYmd(result["Base Obligation Date"]) || startDateStr;
+        // "Action Date" is the date the specific action/transaction was signed
+        const actionDateStr = normalizeDateToYmd(result["Action Date"]) || startDateStr;
         const cfdaNumber = result["CFDA Number"];
         // "Assistance Listings" is the documented field for CFDA program info
         const assistanceListings = result["Assistance Listings"];

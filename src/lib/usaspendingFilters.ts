@@ -111,7 +111,7 @@ export const PRIME_AWARD_FIELDS = [
   "Awarding Sub Agency",
   "Start Date",
   "End Date",
-  "Base Obligation Date",
+  "Action Date",
   "Description",
   "CFDA Number",
   "Assistance Listings",
