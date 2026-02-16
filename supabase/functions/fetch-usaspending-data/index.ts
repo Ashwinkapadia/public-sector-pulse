@@ -391,7 +391,7 @@ async function processData(
           },
           fields: [
             "Award ID",
-            "Internal ID",
+            "generated_internal_id",
             "Recipient Name",
             "Recipient Location",
             "Award Amount",
@@ -400,10 +400,10 @@ async function processData(
             "Awarding Sub Agency",
             "Start Date",
             "End Date",
-            "Action Date",
+            "Base Obligation Date",
             "Description",
             "CFDA Number",
-            "CFDA Title",
+            "Assistance Listings",
           ],
           subawards: false, // Explicitly Prime Awards only
           limit: 100,
@@ -462,7 +462,7 @@ async function processData(
             },
             fields: [
               "Award ID",
-              "Internal ID",
+              "generated_internal_id",
               "Recipient Name",
               "Recipient Location",
               "Award Amount",
@@ -471,10 +471,10 @@ async function processData(
               "Awarding Sub Agency",
               "Start Date",
               "End Date",
-              "Action Date",
+              "Base Obligation Date",
               "Description",
               "CFDA Number",
-              "CFDA Title",
+              "Assistance Listings",
             ],
             subawards: false, // Explicitly Prime Awards only
             limit: 100,
@@ -624,9 +624,12 @@ async function processData(
         const awardingAgency = result["Awarding Agency"] || "Unknown";
         const startDateStr = normalizeDateToYmd(result["Start Date"]);
         const endDateStr = normalizeDateToYmd(result["End Date"]);
-        const actionDateStr = normalizeDateToYmd(result["Action Date"]) || startDateStr;
+        // "Base Obligation Date" is the documented date field for when the obligation occurred
+        const actionDateStr = normalizeDateToYmd(result["Base Obligation Date"]) || startDateStr;
         const cfdaNumber = result["CFDA Number"];
-        const cfdaTitle = result["CFDA Title"];
+        // "Assistance Listings" is the documented field for CFDA program info
+        const assistanceListings = result["Assistance Listings"];
+        const cfdaTitle = assistanceListings?.title || assistanceListings?.program_title || "";
 
         let grantTypeId = null;
         if (cfdaNumber) grantTypeId = grantTypeMap.get(cfdaNumber) || null;
@@ -681,7 +684,7 @@ async function processData(
         existingRecords.add(recordKey);
 
         const awardId = result["Award ID"];
-        const internalId = result["Internal ID"] || result["internal_id"] || result["generated_internal_id"];
+        const internalId = result["generated_internal_id"];
 
         fundingBatch.push({
           organization_id: organizationId,

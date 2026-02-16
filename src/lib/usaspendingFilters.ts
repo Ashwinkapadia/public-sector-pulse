@@ -102,7 +102,7 @@ export const getBaseFilters = (options: {
  */
 export const PRIME_AWARD_FIELDS = [
   "Award ID",
-  "Internal ID",
+  "generated_internal_id",
   "Recipient Name",
   "Recipient Location",
   "Award Amount",
@@ -111,10 +111,10 @@ export const PRIME_AWARD_FIELDS = [
   "Awarding Sub Agency",
   "Start Date",
   "End Date",
-  "Action Date",
+  "Base Obligation Date",
   "Description",
-  "Assistance Listing Number",
-  "Assistance Listing Title",
+  "CFDA Number",
+  "Assistance Listings",
 ];
 
 /**
@@ -129,4 +129,5 @@ export const SUB_AWARD_FIELDS = [
   "Sub-Award Description",
   "Sub-Award Primary Place of Performance",
   "Prime Award ID",
+  "Assistance Listing",
 ];
