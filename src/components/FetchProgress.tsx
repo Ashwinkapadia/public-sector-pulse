@@ -2,9 +2,10 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { AlertCircle, CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, XCircle, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 
 interface FetchProgressData {
   session_id: string;
@@ -24,29 +25,32 @@ interface FetchProgressProps {
   onComplete?: () => void;
 }
 
+// If no update for this many ms, consider the session stale
+const STALE_TIMEOUT_MS = 90_000; // 90 seconds
+
 export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
   const [progress, setProgress] = useState<FetchProgressData | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
-  
-  // Use ref to avoid re-subscribing when onComplete changes
+  const [isStale, setIsStale] = useState(false);
+
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
-  
-  // Track if we've already called onComplete to prevent double-calls
   const hasCalledComplete = useRef(false);
+  const lastUpdateTime = useRef<number>(Date.now());
 
   useEffect(() => {
     if (!sessionId) {
-      // Reset state when sessionId is cleared
       setProgress(null);
       setLogs([]);
+      setIsStale(false);
       hasCalledComplete.current = false;
       return;
     }
 
     hasCalledComplete.current = false;
+    setIsStale(false);
+    lastUpdateTime.current = Date.now();
 
-    // Fetch progress once. Returns the latest row when available.
     const fetchProgressOnce = async () => {
       const { data, error } = await supabase
         .from("fetch_progress")
@@ -54,18 +58,25 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
         .eq("session_id", sessionId)
         .single();
 
-      if (error) {
-        // Avoid noisy UI errors; this can happen briefly if the row isn't created yet.
-        return null;
-      }
+      if (error) return null;
 
       if (data) {
-        setProgress(data);
+        setProgress((prev) => {
+          // Track if data actually changed
+          if (!prev || prev.current_page !== data.current_page || prev.records_inserted !== data.records_inserted || prev.status !== data.status) {
+            lastUpdateTime.current = Date.now();
+            setIsStale(false);
+          }
+          return data;
+        });
         if (data.message) {
-          setLogs((prev) => [...prev, `[${new Date(data.updated_at).toLocaleTimeString()}] ${data.message}`]);
+          setLogs((prev) => {
+            const newLog = `[${new Date(data.updated_at).toLocaleTimeString()}] ${data.message}`;
+            if (prev.length > 0 && prev[prev.length - 1] === newLog) return prev;
+            return [...prev, newLog];
+          });
         }
-        
-        // Check if already completed (in case we missed the realtime event)
+
         if ((data.status === "completed" || data.status === "failed") && !hasCalledComplete.current) {
           hasCalledComplete.current = true;
           onCompleteRef.current?.();
@@ -75,13 +86,10 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
       return data as FetchProgressData;
     };
 
-    // Always do an initial fetch so the progress UI appears immediately.
     fetchProgressOnce();
 
-    // Polling fallback: Realtime can be unavailable/misconfigured in some environments.
-    // Poll until completed/failed so auto-refresh is reliable.
     const pollIntervalMs = 2000;
-    const maxPollMs = 10 * 60 * 1000; // 10 minutes safety stop
+    const maxPollMs = 10 * 60 * 1000;
     const startedAt = Date.now();
 
     const intervalId = window.setInterval(async () => {
@@ -91,6 +99,11 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
         return;
       }
 
+      // Check for stale session
+      if (Date.now() - lastUpdateTime.current > STALE_TIMEOUT_MS) {
+        setIsStale(true);
+      }
+
       const latest = await fetchProgressOnce();
       if (!latest) return;
       if (latest.status === "completed" || latest.status === "failed") {
@@ -98,7 +111,6 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
       }
     }, pollIntervalMs);
 
-    // Subscribe to realtime updates
     const channel = supabase
       .channel(`fetch-progress-${sessionId}`)
       .on(
@@ -112,7 +124,9 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
         (payload) => {
           const newData = payload.new as FetchProgressData;
           setProgress(newData);
-          
+          lastUpdateTime.current = Date.now();
+          setIsStale(false);
+
           if (newData.message) {
             setLogs((prev) => [
               ...prev,
@@ -132,38 +146,38 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
       window.clearInterval(intervalId);
       supabase.removeChannel(channel);
     };
-  }, [sessionId]); // Only re-subscribe when sessionId changes, not onComplete
+  }, [sessionId]);
+
+  const handleDismiss = () => {
+    // Force complete — dismiss the stuck progress and refresh dashboard
+    hasCalledComplete.current = true;
+    onCompleteRef.current?.();
+  };
 
   if (!sessionId || !progress) return null;
 
-  const progressPercent = progress.total_pages > 0 
-    ? (progress.current_page / progress.total_pages) * 100 
+  const progressPercent = progress.total_pages > 0
+    ? (progress.current_page / progress.total_pages) * 100
     : 0;
 
+  const isRunning = progress.status === "running";
+  const isCompleted = progress.status === "completed";
+  const isFailed = progress.status === "failed";
+
   const getStatusIcon = () => {
-    switch (progress.status) {
-      case "running":
-        return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
-      case "completed":
-        return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-      case "failed":
-        return <XCircle className="h-5 w-5 text-destructive" />;
-      default:
-        return <AlertCircle className="h-5 w-5 text-muted-foreground" />;
-    }
+    if (isStale) return <AlertCircle className="h-5 w-5 text-yellow-500" />;
+    if (isRunning) return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
+    if (isCompleted) return <CheckCircle2 className="h-5 w-5 text-green-600" />;
+    if (isFailed) return <XCircle className="h-5 w-5 text-destructive" />;
+    return <AlertCircle className="h-5 w-5 text-muted-foreground" />;
   };
 
   const getStatusText = () => {
-    switch (progress.status) {
-      case "running":
-        return "Fetching data...";
-      case "completed":
-        return "Fetch completed successfully";
-      case "failed":
-        return "Fetch failed";
-      default:
-        return "Unknown status";
-    }
+    if (isStale) return "Fetch may have stalled — no updates received";
+    if (isRunning) return "Fetching data...";
+    if (isCompleted) return "Fetch completed successfully";
+    if (isFailed) return "Fetch failed";
+    return "Unknown status";
   };
 
   return (
@@ -178,17 +192,39 @@ export function FetchProgress({ sessionId, onComplete }: FetchProgressProps) {
               {progress.source} • {progress.state}
             </p>
           </div>
+          {/* Dismiss button — always available so user can close stuck progress */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleDismiss}
+            title="Dismiss and refresh dashboard"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
 
+        {/* Stale warning */}
+        {isStale && isRunning && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No progress updates for over 90 seconds. The fetch may have timed out.
+              Click the X to dismiss and refresh the dashboard with whatever data was inserted.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Progress Bar */}
-        {progress.status === "running" && (
+        {isRunning && !isStale && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                {progress.total_pages} total pages found • {progress.current_page} pages processed
+                {progress.total_pages > 0
+                  ? `${progress.total_pages} total pages found • ${progress.current_page} pages processed`
+                  : "Discovering pages..."}
               </span>
               <span className="text-muted-foreground">
-                {Math.round(progressPercent)}%
+                {progress.total_pages > 0 ? `${Math.round(progressPercent)}%` : ""}
               </span>
             </div>
             <Progress value={progressPercent} className="h-2" />
