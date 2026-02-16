@@ -640,7 +640,7 @@ async function processData(
         let verticalName = "Other";
         if (combinedText.match(/\b(workforce|employment|job training|career|apprentice|labor|occupational|vocational training|wioa)\b/)) {
           verticalName = "Workforce Development";
-        } else if (combinedText.match(/\b(aging|elderly|senior|older adult|elder care|geriatric|nutrition for the elderly|meals on wheels)\b/)) {
+        } else if (combinedText.match(/\b(aging|elderly|senior|older adult|elder care|geriatric|nutrition for the elderly|meals on wheels|title iii|older americans|area agency on aging|aoa)\b/)) {
           verticalName = "Aging Services";
         } else if (combinedText.match(/\b(veteran|veterans|va medical|military service|veteran affairs)\b/)) {
           verticalName = "Veterans";
@@ -654,8 +654,18 @@ async function processData(
           verticalName = "Energy & Environment";
         } else if (combinedText.match(/\b(transportation|transit|highway|airport|port|infrastructure|rail|bridge|road|traffic)\b/)) {
           verticalName = "Transportation & Infrastructure";
-        } else if (combinedText.match(/\b(education|school|student|academic|university|college|learning|literacy|teach)\b/)) {
+        } else if (combinedText.match(/\b(university|college|higher education|postsecondary|post-secondary|graduate|undergraduate|pell grant|student aid|student loan|federal student|title iv|fafsa)\b/)) {
+          verticalName = "Higher Education";
+        } else if (combinedText.match(/\b(k-12|k12|elementary|secondary|school district|public school|title i |head start|idea |special education|charter school)\b/)) {
+          verticalName = "K-12 Education";
+        } else if (combinedText.match(/\b(education|school|student|academic|learning|literacy|teach)\b/)) {
           verticalName = "Education";
+        } else if (combinedText.match(/\b(medicaid|chip|children.s health insurance)\b/)) {
+          verticalName = "Medicaid";
+        } else if (combinedText.match(/\b(public health|epidemiol|disease control|cdc|immunization|vaccination|pandemic|preparedness|surveillance)\b/)) {
+          verticalName = "Public Health";
+        } else if (combinedText.match(/\b(public safety|law enforcement|police|fire|emergency management|homeland|fema|disaster)\b/)) {
+          verticalName = "Public Safety";
         } else if (combinedText.match(/\b(health|medical|hospital|clinic|disease|mental health|substance abuse|treatment|patient|care)\b/)) {
           verticalName = "Healthcare";
         }

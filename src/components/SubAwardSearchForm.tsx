@@ -39,7 +39,12 @@ export interface SubAwardSearchFormRef {
   setStartDate: (date: Date) => void;
   setEndDate: (date: Date) => void;
   setState: (state: string) => void;
-  triggerSearch: (overrideCfda?: string) => void;
+  triggerSearch: (overrides?: {
+    cfda?: string;
+    startDate?: Date;
+    endDate?: Date;
+    state?: string;
+  }) => void;
 }
 
 interface SubAwardSearchFormProps {
@@ -115,14 +120,22 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
     setStartDate: (date: Date) => setStartDate(date),
     setEndDate: (date: Date) => setEndDate(date),
     setState: (value: string) => setState(value),
-    triggerSearch: (overrideCfda?: string) => {
-      const cfdaToUse = overrideCfda !== undefined ? overrideCfda : cfdaNumber;
+    triggerSearch: (overrides?: {
+      cfda?: string;
+      startDate?: Date;
+      endDate?: Date;
+      state?: string;
+    }) => {
+      const cfdaToUse = overrides?.cfda !== undefined ? overrides.cfda : cfdaNumber;
+      const sd = overrides?.startDate || startDate;
+      const ed = overrides?.endDate || endDate;
+      const st = overrides?.state !== undefined ? overrides.state : state;
       onSearch(
         cfdaToUse,
         keywords,
-        startDate ? format(startDate, "yyyy-MM-dd") : "2024-01-01",
-        endDate ? format(endDate, "yyyy-MM-dd") : "2024-12-31",
-        state,
+        sd ? format(sd, "yyyy-MM-dd") : "2024-01-01",
+        ed ? format(ed, "yyyy-MM-dd") : "2024-12-31",
+        st,
         agencies
       );
     },
