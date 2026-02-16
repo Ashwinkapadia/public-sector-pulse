@@ -34,10 +34,19 @@ export interface SubAwardSearchResponse {
 
 export function useSubAwardSearch() {
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<SubAwardResult[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasNext, setHasNext] = useState(false);
-  const [total, setTotal] = useState(0);
+  const [results, setResults] = useState<SubAwardResult[]>(() => {
+    const saved = sessionStorage.getItem("subaward_results");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [page, setPage] = useState(() => {
+    return Number(sessionStorage.getItem("subaward_page")) || 1;
+  });
+  const [hasNext, setHasNext] = useState(() => {
+    return sessionStorage.getItem("subaward_hasNext") === "true";
+  });
+  const [total, setTotal] = useState(() => {
+    return Number(sessionStorage.getItem("subaward_total")) || 0;
+  });
   const [lastParams, setLastParams] = useState<SubAwardSearchParams | null>(null);
   const { toast } = useToast();
 
@@ -120,6 +129,12 @@ export function useSubAwardSearch() {
       setHasNext(data.page_metadata?.hasNext || false);
       setTotal(data.page_metadata?.total || mappedResults.length);
 
+      // Persist to sessionStorage
+      sessionStorage.setItem("subaward_results", JSON.stringify(mappedResults));
+      sessionStorage.setItem("subaward_page", String(data.page_metadata?.page || 1));
+      sessionStorage.setItem("subaward_hasNext", String(data.page_metadata?.hasNext || false));
+      sessionStorage.setItem("subaward_total", String(data.page_metadata?.total || mappedResults.length));
+
       return {
         results: mappedResults,
         page: data.page_metadata?.page || 1,
@@ -145,6 +160,15 @@ export function useSubAwardSearch() {
     setHasNext(false);
     setTotal(0);
     setLastParams(null);
+    sessionStorage.removeItem("subaward_results");
+    sessionStorage.removeItem("subaward_page");
+    sessionStorage.removeItem("subaward_hasNext");
+    sessionStorage.removeItem("subaward_total");
+    localStorage.removeItem("subaward_cfda");
+    localStorage.removeItem("subaward_keywords");
+    localStorage.removeItem("subaward_state");
+    localStorage.removeItem("subaward_startDate");
+    localStorage.removeItem("subaward_endDate");
   };
 
   const goToPage = async (newPage: number) => {

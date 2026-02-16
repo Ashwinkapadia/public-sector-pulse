@@ -142,7 +142,14 @@ export function FundingTable({ state, verticalIds, startDate, endDate }: Funding
     // Include all unique ALN codes (no limit)
     const alnList = uniqueAlnCodes.join(",");
 
-    navigate(`/sub-awards?aln_list=${encodeURIComponent(alnList)}`);
+    // Build URL with ALN codes + current filters (dates & state)
+    const params = new URLSearchParams();
+    params.set("aln_list", alnList);
+    if (state && state !== "ALL") params.set("state", state);
+    if (startDate) params.set("start_date", startDate.toISOString().split("T")[0]);
+    if (endDate) params.set("end_date", endDate.toISOString().split("T")[0]);
+
+    navigate(`/sub-awards?${params.toString()}`);
   };
 
   const exportToCSV = () => {

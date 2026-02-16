@@ -1,4 +1,4 @@
-import { useState, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,9 @@ import { useToast } from "@/hooks/use-toast";
 
 export interface SubAwardSearchFormRef {
   setCfdaNumber: (value: string) => void;
+  setStartDate: (date: Date) => void;
+  setEndDate: (date: Date) => void;
+  setState: (state: string) => void;
   triggerSearch: (overrideCfda?: string) => void;
 }
 
@@ -74,21 +77,31 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
     },
     ref
   ) {
-  const [cfdaNumber, setCfdaNumber] = useState("");
-  const [keywords, setKeywords] = useState("");
-  const [state, setState] = useState("ALL");
+  const [cfdaNumber, setCfdaNumber] = useState(() => localStorage.getItem("subaward_cfda") || "");
+  const [keywords, setKeywords] = useState(() => localStorage.getItem("subaward_keywords") || "");
+  const [state, setState] = useState(() => localStorage.getItem("subaward_state") || "ALL");
   const [agencies, setAgencies] = useState<Agency[]>([]);
-  // Use explicit year, month, day to avoid timezone parsing issues
-  const [startDate, setStartDate] = useState<Date | undefined>(
-    new Date(2024, 0, 1) // Jan 1, 2024 (month is 0-indexed)
-  );
-  const [endDate, setEndDate] = useState<Date | undefined>(
-    new Date(2024, 11, 31) // Dec 31, 2024
-  );
+  const [startDate, setStartDate] = useState<Date | undefined>(() => {
+    const saved = localStorage.getItem("subaward_startDate");
+    return saved ? new Date(saved) : new Date(2024, 0, 1);
+  });
+  const [endDate, setEndDate] = useState<Date | undefined>(() => {
+    const saved = localStorage.getItem("subaward_endDate");
+    return saved ? new Date(saved) : new Date(2024, 11, 31);
+  });
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+
+  // Persist filter state to localStorage
+  useEffect(() => {
+    localStorage.setItem("subaward_cfda", cfdaNumber);
+    localStorage.setItem("subaward_keywords", keywords);
+    localStorage.setItem("subaward_state", state);
+    if (startDate) localStorage.setItem("subaward_startDate", startDate.toISOString());
+    if (endDate) localStorage.setItem("subaward_endDate", endDate.toISOString());
+  }, [cfdaNumber, keywords, state, startDate, endDate]);
 
   // Search is enabled if at least one of: CFDA, Keywords, or Agency has a value
   const canSearch = cfdaNumber.trim() || keywords.trim() || agencies.length > 0;
@@ -99,6 +112,9 @@ export const SubAwardSearchForm = forwardRef<SubAwardSearchFormRef, SubAwardSear
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     setCfdaNumber: (value: string) => setCfdaNumber(value),
+    setStartDate: (date: Date) => setStartDate(date),
+    setEndDate: (date: Date) => setEndDate(date),
+    setState: (value: string) => setState(value),
     triggerSearch: (overrideCfda?: string) => {
       const cfdaToUse = overrideCfda !== undefined ? overrideCfda : cfdaNumber;
       onSearch(
