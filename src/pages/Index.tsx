@@ -105,29 +105,32 @@ const Index = () => {
   useEffect(() => {
     let isMounted = true;
 
-    // Use ONLY onAuthStateChange — it fires with INITIAL_SESSION on mount
-    // and handles token refresh automatically. No separate getUser/getSession needed.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
 
       console.log("[Auth] event:", event, "hasSession:", !!session);
 
-      try {
-        if (!session) {
-          setIsAdmin(null);
-          // Don't redirect on TOKEN_REFRESHED failures — only on explicit sign out or initial load
-          if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
-            navigate("/auth");
-          }
-          return;
-        }
-
-        await refreshAdminStatus(session.user.id);
-      } catch (err) {
-        console.error("Auth state handling failed:", err);
-      } finally {
+      if (!session) {
+        setIsAdmin(null);
         setLoading(false);
+        if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
+          navigate("/auth");
+        }
+        return;
       }
+
+      // CRITICAL: Do NOT await inside onAuthStateChange — it can deadlock.
+      // Defer the RPC call with setTimeout so it runs outside the listener.
+      setTimeout(async () => {
+        if (!isMounted) return;
+        try {
+          await refreshAdminStatus(session.user.id);
+        } catch (err) {
+          console.error("Admin status check failed:", err);
+        } finally {
+          if (isMounted) setLoading(false);
+        }
+      }, 0);
     });
 
     return () => {
