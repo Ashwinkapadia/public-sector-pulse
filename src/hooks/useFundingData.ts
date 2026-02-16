@@ -101,6 +101,7 @@ export function useFundingRecords(
     queryKey: ["funding_records", state, startKey, endKey, verticalsKey],
     // Never serve stale cached data; always fetch fresh when filters change
     staleTime: 0,
+    gcTime: 0, // Don't keep old cache across hot reloads
     refetchOnMount: "always",
     // Disable query until user sets at least one filter
     enabled: hasFilters,
@@ -188,6 +189,7 @@ export function useFundingMetrics(
   return useQuery({
     queryKey: ["funding_metrics", state, startKey, endKey, verticalsKey],
     staleTime: 0,
+    gcTime: 0,
     refetchOnMount: "always",
     // Disable query until user sets at least one filter
     enabled: hasFilters,
