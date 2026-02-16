@@ -556,12 +556,10 @@ async function processData(
     );
 
     let recordsAdded = 0;
-    const processedOrgs = new Set<string>();
-    const existingRecords = new Set<string>();
     const errors: string[] = [];
 
     // Get existing funding records to prevent duplicates
-    // Key now includes action_date so same-amount grants on different dates are preserved
+    const existingRecords = new Set<string>();
     const { data: existingFundingRecords } = await supabaseClient
       .from("funding_records")
       .select("organization_id, amount, fiscal_year, action_date, source")
@@ -571,217 +569,159 @@ async function processData(
       existingRecords.add(`${record.organization_id}-${record.amount}-${record.fiscal_year}-${record.action_date || ''}`);
     });
 
-    // Process each result
+    // --- PHASE 1: Collect unique org names from results ---
+    const uniqueOrgNames = new Set<string>();
+    for (const result of allResults) {
+      const name = result["Recipient Name"];
+      if (name) uniqueOrgNames.add(name);
+    }
+
+    await supabaseClient
+      .from("fetch_progress")
+      .update({ message: `Resolving ${uniqueOrgNames.size} organizations...` })
+      .eq("session_id", progressSessionId);
+
+    // Fetch all existing orgs for this state in one query
+    const { data: existingOrgs } = await supabaseClient
+      .from("organizations")
+      .select("id, name")
+      .eq("state", state);
+
+    const orgNameToId = new Map<string, string>();
+    (existingOrgs || []).forEach((org: any) => orgNameToId.set(org.name, org.id));
+
+    // Batch-insert new organizations
+    const newOrgNames = Array.from(uniqueOrgNames).filter(n => !orgNameToId.has(n));
+    if (newOrgNames.length > 0) {
+      // Insert in batches of 200
+      for (let i = 0; i < newOrgNames.length; i += 200) {
+        const batch = newOrgNames.slice(i, i + 200).map(name => ({
+          name,
+          state,
+          last_updated: new Date().toISOString().split("T")[0],
+        }));
+        const { data: inserted, error: insertErr } = await supabaseClient
+          .from("organizations")
+          .insert(batch)
+          .select("id, name");
+        if (insertErr) {
+          console.error("Batch org insert error:", insertErr);
+        } else {
+          (inserted || []).forEach((org: any) => orgNameToId.set(org.name, org.id));
+        }
+      }
+    }
+
+    console.log(`Resolved ${orgNameToId.size} organizations (${newOrgNames.length} new)`);
+
+    // --- PHASE 2: Prepare all funding records in memory ---
+    const fundingBatch: any[] = [];
+
     for (const result of allResults) {
       try {
-         const recipientName = result["Recipient Name"];
-         const awardAmount = parseFloat(result["Award Amount"]) || 0;
-         const awardingAgency = result["Awarding Agency"] || "Unknown";
-         const startDateStr = normalizeDateToYmd(result["Start Date"]);
-         const endDateStr = normalizeDateToYmd(result["End Date"]);
-         // Per your decision: use USAspending "Action Date" as the dashboard filter driver.
-         const actionDateStr = normalizeDateToYmd(result["Action Date"]) || startDateStr;
-         const cfdaNumber = result["CFDA Number"];
-         const cfdaTitle = result["CFDA Title"];
+        const recipientName = result["Recipient Name"];
+        const awardAmount = parseFloat(result["Award Amount"]) || 0;
+        const awardingAgency = result["Awarding Agency"] || "Unknown";
+        const startDateStr = normalizeDateToYmd(result["Start Date"]);
+        const endDateStr = normalizeDateToYmd(result["End Date"]);
+        const actionDateStr = normalizeDateToYmd(result["Action Date"]) || startDateStr;
+        const cfdaNumber = result["CFDA Number"];
+        const cfdaTitle = result["CFDA Title"];
 
-        // Match grant type by CFDA code first, then by name
         let grantTypeId = null;
-        if (cfdaNumber) {
-          grantTypeId = grantTypeMap.get(cfdaNumber) || null;
-        }
-        if (!grantTypeId && cfdaTitle) {
-          grantTypeId = grantTypeNameMap.get(cfdaTitle.toLowerCase()) || null;
-        }
+        if (cfdaNumber) grantTypeId = grantTypeMap.get(cfdaNumber) || null;
+        if (!grantTypeId && cfdaTitle) grantTypeId = grantTypeNameMap.get(cfdaTitle.toLowerCase()) || null;
 
-        // Determine vertical using intelligent mapping
+        // Determine vertical
         const description = result["Description"] || "";
         const subAgency = result["Awarding Sub Agency"] || "";
         const combinedText = `${cfdaTitle} ${description} ${awardingAgency} ${subAgency} ${recipientName}`.toLowerCase();
         
         let verticalName = "Other";
-        
-        // Workforce Development
-        if (
-          combinedText.match(/\b(workforce|employment|job training|career|apprentice|labor|occupational|vocational training|wioa)\b/)
-        ) {
+        if (combinedText.match(/\b(workforce|employment|job training|career|apprentice|labor|occupational|vocational training|wioa)\b/)) {
           verticalName = "Workforce Development";
-        }
-        // Aging Services
-        else if (
-          combinedText.match(/\b(aging|elderly|senior|older adult|elder care|geriatric|nutrition for the elderly|meals on wheels)\b/)
-        ) {
+        } else if (combinedText.match(/\b(aging|elderly|senior|older adult|elder care|geriatric|nutrition for the elderly|meals on wheels)\b/)) {
           verticalName = "Aging Services";
-        }
-        // Veterans
-        else if (
-          combinedText.match(/\b(veteran|veterans|va medical|military service|veteran affairs)\b/)
-        ) {
+        } else if (combinedText.match(/\b(veteran|veterans|va medical|military service|veteran affairs)\b/)) {
           verticalName = "Veterans";
-        }
-        // CVI Prevention (Community Violence Intervention)
-        else if (
-          combinedText.match(/\b(violence intervention|violence prevention|community violence|crime prevention|juvenile justice|gang|victim)\b/)
-        ) {
+        } else if (combinedText.match(/\b(violence intervention|violence prevention|community violence|crime prevention|juvenile justice|gang|victim)\b/)) {
           verticalName = "CVI Prevention";
-        }
-        // Home Visiting
-        else if (
-          combinedText.match(/\b(home visiting|maternal health|child health|early childhood|home visitation|maternal infant|prenatal|postpartum|family support|healthy start)\b/)
-        ) {
+        } else if (combinedText.match(/\b(home visiting|maternal health|child health|early childhood|home visitation|maternal infant|prenatal|postpartum|family support|healthy start)\b/)) {
           verticalName = "Home Visiting";
-        }
-        // Re-entry
-        else if (
-          combinedText.match(/\b(reentry|re-entry|prisoner reintegration|correctional|prison|incarceration|offender|recidivism|post-release|second chance)\b/)
-        ) {
+        } else if (combinedText.match(/\b(reentry|re-entry|prisoner reintegration|correctional|prison|incarceration|offender|recidivism|post-release|second chance)\b/)) {
           verticalName = "Re-entry";
-        }
-        // Energy & Environment (catch more grants)
-        else if (
-          combinedText.match(/\b(energy|renewable|solar|wind|climate|environment|conservation|emission|carbon|battery|electric|hydrogen|green|sustainable|recycl)\b/)
-        ) {
+        } else if (combinedText.match(/\b(energy|renewable|solar|wind|climate|environment|conservation|emission|carbon|battery|electric|hydrogen|green|sustainable|recycl)\b/)) {
           verticalName = "Energy & Environment";
-        }
-        // Transportation & Infrastructure
-        else if (
-          combinedText.match(/\b(transportation|transit|highway|airport|port|infrastructure|rail|bridge|road|traffic)\b/)
-        ) {
+        } else if (combinedText.match(/\b(transportation|transit|highway|airport|port|infrastructure|rail|bridge|road|traffic)\b/)) {
           verticalName = "Transportation & Infrastructure";
-        }
-        // Education
-        else if (
-          combinedText.match(/\b(education|school|student|academic|university|college|learning|literacy|teach)\b/)
-        ) {
+        } else if (combinedText.match(/\b(education|school|student|academic|university|college|learning|literacy|teach)\b/)) {
           verticalName = "Education";
-        }
-        // Healthcare
-        else if (
-          combinedText.match(/\b(health|medical|hospital|clinic|disease|mental health|substance abuse|treatment|patient|care)\b/)
-        ) {
+        } else if (combinedText.match(/\b(health|medical|hospital|clinic|disease|mental health|substance abuse|treatment|patient|care)\b/)) {
           verticalName = "Healthcare";
         }
-        
-        console.log(`Mapping "${recipientName}" to vertical: ${verticalName}`);
 
         const verticalId = verticalMap.get(verticalName.toLowerCase());
+        if (!verticalId) continue;
 
-        if (!verticalId) {
-          console.log(`Skipping - vertical not found: ${verticalName}`);
-          continue;
-        }
+        const organizationId = orgNameToId.get(recipientName);
+        if (!organizationId) continue;
 
-        // Check if organization already exists
-        let organizationId: string;
-
-        if (processedOrgs.has(recipientName)) {
-          const { data: existingOrg } = await supabaseClient
-            .from("organizations")
-            .select("id")
-            .eq("name", recipientName)
-            .eq("state", state)
-            .single();
-
-          organizationId = existingOrg?.id;
-        } else {
-          const { data: existingOrg } = await supabaseClient
-            .from("organizations")
-            .select("id")
-            .eq("name", recipientName)
-            .eq("state", state)
-            .maybeSingle();
-
-          if (existingOrg) {
-            organizationId = existingOrg.id;
-          } else {
-            // Insert new organization
-            const { data: newOrg, error: orgError } = await supabaseClient
-              .from("organizations")
-              .insert({
-                name: recipientName,
-                state: state,
-                last_updated: new Date().toISOString().split("T")[0],
-              })
-              .select()
-              .single();
-
-            if (orgError) {
-              console.error("Error inserting organization:", orgError);
-              continue;
-            }
-
-            organizationId = newOrg.id;
-          }
-
-          processedOrgs.add(recipientName);
-        }
-
-        // Check for duplicate funding record (includes action_date to distinguish same-amount grants)
         const recordKey = `${organizationId}-${awardAmount}-${fiscalYear}-${actionDateStr || ''}`;
-        if (existingRecords.has(recordKey)) {
-          console.log(`Skipping duplicate record for ${recipientName}`);
-          continue;
-        }
+        if (existingRecords.has(recordKey)) continue;
+        existingRecords.add(recordKey);
 
-        // Get award IDs to store in notes for later subaward fetching
         const awardId = result["Award ID"];
         const internalId = result["Internal ID"] || result["internal_id"] || result["generated_internal_id"];
-        
-        // Store award IDs in notes so subawards can be fetched separately
-        const notesWithAwardIds = `From USAspending.gov - ${awardingAgency}, internal_id:${internalId || ''}, award_id:${awardId || ''}`;
 
-        // Insert funding record with last_updated timestamp and action_date
-         const { error: fundingError } = await supabaseClient
-          .from("funding_records")
-          .insert({
-            organization_id: organizationId,
-            vertical_id: verticalId,
-            amount: awardAmount,
-            status: "Active",
-            fiscal_year: fiscalYear,
-             // Persist canonical YYYY-MM-DD strings for consistent filtering.
-             date_range_start: startDateStr,
-             date_range_end: endDateStr,
-             action_date: actionDateStr,
-            cfda_code: cfdaNumber || null,
-            grant_type_id: grantTypeId,
-            notes: notesWithAwardIds,
-            source: "USAspending.gov",
-            last_updated: new Date().toISOString(),
-          });
-
-        if (fundingError) {
-          console.error("Error inserting funding record:", fundingError);
-        } else {
-          recordsAdded++;
-          existingRecords.add(recordKey);
-          
-          // Update progress every 10 records
-          if (recordsAdded % 10 === 0) {
-            await supabaseClient
-              .from("fetch_progress")
-              .update({
-                records_inserted: recordsAdded,
-                message: `Inserted ${recordsAdded} prime awards...`,
-              })
-              .eq("session_id", progressSessionId);
-          }
-        }
+        fundingBatch.push({
+          organization_id: organizationId,
+          vertical_id: verticalId,
+          amount: awardAmount,
+          status: "Active",
+          fiscal_year: fiscalYear,
+          date_range_start: startDateStr,
+          date_range_end: endDateStr,
+          action_date: actionDateStr,
+          cfda_code: cfdaNumber || null,
+          grant_type_id: grantTypeId,
+          notes: `From USAspending.gov - ${awardingAgency}, internal_id:${internalId || ''}, award_id:${awardId || ''}`,
+          source: "USAspending.gov",
+          last_updated: new Date().toISOString(),
+        });
       } catch (error) {
-        console.error("Error processing result:", error);
         const errorMsg = error instanceof Error ? error.message : String(error);
         errors.push(errorMsg);
-        
-        // Update progress with error
-        if (errors.length <= 5) { // Only log first 5 errors to avoid bloat
-          await supabaseClient
-            .from("fetch_progress")
-            .update({
-              errors,
-              message: `Error processing record: ${errorMsg}`,
-            })
-            .eq("session_id", progressSessionId);
-        }
       }
+    }
+
+    // --- PHASE 3: Batch insert funding records ---
+    await supabaseClient
+      .from("fetch_progress")
+      .update({ message: `Inserting ${fundingBatch.length} funding records...` })
+      .eq("session_id", progressSessionId);
+
+    const BATCH_SIZE = 200;
+    for (let i = 0; i < fundingBatch.length; i += BATCH_SIZE) {
+      const batch = fundingBatch.slice(i, i + BATCH_SIZE);
+      const { error: batchErr, data: batchData } = await supabaseClient
+        .from("funding_records")
+        .insert(batch)
+        .select("id");
+
+      if (batchErr) {
+        console.error(`Batch insert error (batch ${i / BATCH_SIZE + 1}):`, batchErr);
+        errors.push(`Batch insert failed: ${batchErr.message}`);
+      } else {
+        recordsAdded += (batchData || []).length;
+      }
+
+      await supabaseClient
+        .from("fetch_progress")
+        .update({
+          records_inserted: recordsAdded,
+          message: `Inserted ${recordsAdded} of ${fundingBatch.length} prime awards...`,
+        })
+        .eq("session_id", progressSessionId);
     }
 
     console.log(`Successfully added ${recordsAdded} prime awards`);
