@@ -651,7 +651,12 @@ async function processData(
         const startDateStr = normalizeDateToYmd(result["Start Date"]);
         const endDateStr = normalizeDateToYmd(result["End Date"]);
         // "Action Date" is the date the specific action/transaction was signed
-        const actionDateStr = normalizeDateToYmd(result["Action Date"]) || startDateStr;
+        // Fallback chain: Action Date → Start Date → End Date → search start date
+        const actionDateStr = normalizeDateToYmd(result["Action Date"])
+          || startDateStr
+          || endDateStr
+          || (startDate ? normalizeDateToYmd(startDate) : null)
+          || `${fiscalYear}-01-01`;
         const cfdaNumber = result["CFDA Number"];
         // "Assistance Listings" is the documented field for CFDA program info
         const assistanceListings = result["Assistance Listings"];
