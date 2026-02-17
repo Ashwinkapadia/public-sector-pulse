@@ -45,6 +45,21 @@ export function VerticalsFilter({
         )}
       </div>
 
+      {/* All Verticals option */}
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="all-verticals"
+          checked={selectedVerticals.length === 0}
+          onCheckedChange={() => onSelectVerticals([])}
+        />
+        <Label
+          htmlFor="all-verticals"
+          className="text-sm font-semibold cursor-pointer"
+        >
+          All Verticals
+        </Label>
+      </div>
+
       {/* Selected verticals badges */}
       {selectedVerticals.length > 0 && (
         <div className="flex flex-wrap gap-2">
