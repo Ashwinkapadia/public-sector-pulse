@@ -98,7 +98,18 @@ Deno.serve(async (req) => {
       // sort matching ALN prefixes to the top and tag them
       if (alnPrefixes && Array.isArray(alnPrefixes) && alnPrefixes.length > 0) {
         results = results.map((r: any) => {
-          const prefix = r.aln !== "N/A" ? r.aln.split(".")[0] : "";
+          // ALN can be "93.044" (with dot) or "93044" (no dot) or plain "93"
+          // Extract the agency prefix (digits before the first dot, or the first 2 digits)
+          let prefix = "";
+          if (r.aln && r.aln !== "N/A") {
+            if (r.aln.includes(".")) {
+              prefix = r.aln.split(".")[0];
+            } else if (r.aln.length >= 2) {
+              // Numeric only format like "93044" — first 2 digits are the agency code
+              prefix = r.aln.substring(0, 2);
+            }
+          }
+          console.log(`ALN: ${r.aln} → prefix: ${prefix}, prefixes: [${alnPrefixes.join(",")}], match: ${alnPrefixes.includes(prefix)}`);
           const isMatch = alnPrefixes.includes(prefix);
           return { ...r, verticalMatch: isMatch };
         });
