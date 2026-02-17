@@ -22,6 +22,7 @@ export interface BaseFilters {
   recipient_locations?: { country: string; state: string }[];
   place_of_performance_locations?: { country: string; state: string }[];
   agencies?: { type: string; tier: string; name: string }[];
+  recipient_type_names?: string[];
 }
 
 /**
