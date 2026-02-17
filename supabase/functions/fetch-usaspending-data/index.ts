@@ -388,6 +388,19 @@ async function processData(
             ],
             // Grant award type codes: 02=Block, 03=Formula, 04=Project, 05=Cooperative Agreement
             award_type_codes: ["02", "03", "04", "05"],
+            // Filter to government entity recipient types only
+            recipient_type_names: [
+              "Authorities and Commissions",
+              "Local Government",
+              "Regional and State Government",
+              "Interstate Entity",
+              "Indian Native American Tribal Government",
+              "Government",
+              "Regional Organization",
+              "U.S. Territory or Possession",
+              "Council of Governments",
+              "National Government",
+            ],
           },
           fields: [
             "Award ID",
@@ -459,6 +472,19 @@ async function processData(
               ],
               // Grant award type codes: 02=Block, 03=Formula, 04=Project, 05=Cooperative Agreement
               award_type_codes: ["02", "03", "04", "05"],
+              // Filter to government entity recipient types only
+              recipient_type_names: [
+                "Authorities and Commissions",
+                "Local Government",
+                "Regional and State Government",
+                "Interstate Entity",
+                "Indian Native American Tribal Government",
+                "Government",
+                "Regional Organization",
+                "U.S. Territory or Possession",
+                "Council of Governments",
+                "National Government",
+              ],
             },
             fields: [
               "Award ID",
