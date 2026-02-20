@@ -39,49 +39,69 @@ Deno.serve(async (req) => {
 
     // ─── Step 1: Grants.gov Discovery ───
     if (action === "discover") {
-      // Search Grants.gov directly — no API key needed
-      const grantsPayload: any = {
-        rows: 100,
+      const PAGE_SIZE = 100;
+      const MAX_PAGES = 50; // safety cap: 5000 results max
+
+      const basePayload: any = {
+        rows: PAGE_SIZE,
         oppStatuses: "forecasted|posted",
         sortBy: "openDate|desc",
       };
 
-      // Apply ALN prefix filter if vertical selected
       if (alnPrefixes && Array.isArray(alnPrefixes) && alnPrefixes.length > 0) {
-        // Grants.gov supports ALN search — use first prefix as primary filter
-        grantsPayload.aln = alnPrefixes[0];
+        basePayload.aln = alnPrefixes[0];
       }
 
       if (startDate) {
         const sd = new Date(startDate);
-        grantsPayload.postedFrom = `${String(sd.getMonth() + 1).padStart(2, "0")}/${String(sd.getDate()).padStart(2, "0")}/${sd.getFullYear()}`;
+        basePayload.postedFrom = `${String(sd.getMonth() + 1).padStart(2, "0")}/${String(sd.getDate()).padStart(2, "0")}/${sd.getFullYear()}`;
       }
       if (endDate) {
         const ed = new Date(endDate);
-        grantsPayload.postedTo = `${String(ed.getMonth() + 1).padStart(2, "0")}/${String(ed.getDate()).padStart(2, "0")}/${ed.getFullYear()}`;
+        basePayload.postedTo = `${String(ed.getMonth() + 1).padStart(2, "0")}/${String(ed.getDate()).padStart(2, "0")}/${ed.getFullYear()}`;
       }
 
-      console.log("Grants.gov discover payload:", JSON.stringify(grantsPayload));
+      // Paginate through all results
+      let allOpportunities: any[] = [];
+      let totalCount = 0;
+      let page = 0;
 
-      const response = await fetch("https://api.grants.gov/v1/api/search2", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(grantsPayload),
-      });
+      while (page < MAX_PAGES) {
+        const payload = { ...basePayload, startRecordNum: page * PAGE_SIZE };
+        console.log(`Grants.gov page ${page + 1}:`, JSON.stringify(payload));
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("Grants.gov error:", errText);
-        return new Response(JSON.stringify({ error: `Grants.gov API error: ${response.status}` }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        const response = await fetch("https://api.grants.gov/v1/api/search2", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error("Grants.gov error:", errText);
+          if (allOpportunities.length === 0) {
+            return new Response(JSON.stringify({ error: `Grants.gov API error: ${response.status}` }), {
+              status: 502,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          break; // return what we have so far
+        }
+
+        const data = await response.json();
+        const hits = data.data?.oppHits || [];
+        totalCount = data.data?.totalCount || 0;
+        allOpportunities = allOpportunities.concat(hits);
+
+        console.log(`Fetched ${allOpportunities.length} / ${totalCount}`);
+
+        if (allOpportunities.length >= totalCount || hits.length < PAGE_SIZE) {
+          break;
+        }
+        page++;
       }
 
-      const data = await response.json();
-      const opportunities = data.data?.oppHits || [];
-
-      let results = opportunities.map((opp: any) => {
+      let results = allOpportunities.map((opp: any) => {
         const alnRaw = opp.alnList || opp.cfdaList || "";
         // Extract first ALN — handle both string and array formats
         let firstAln = "N/A";
@@ -120,8 +140,7 @@ Deno.serve(async (req) => {
         results.sort((a: any, b: any) => (b.verticalMatch ? 1 : 0) - (a.verticalMatch ? 1 : 0));
       }
 
-      const totalCount = data.data?.totalCount || results.length;
-      return new Response(JSON.stringify({ results, totalCount }), {
+      return new Response(JSON.stringify({ results, totalCount: totalCount || results.length }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
