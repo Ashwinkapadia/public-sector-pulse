@@ -83,8 +83,13 @@ Deno.serve(async (req) => {
 
       let results = opportunities.map((opp: any) => {
         const alnRaw = opp.alnList || opp.cfdaList || "";
-        // Extract first ALN from the list
-        const firstAln = alnRaw.split(",")[0]?.trim() || "N/A";
+        // Extract first ALN — handle both string and array formats
+        let firstAln = "N/A";
+        if (Array.isArray(alnRaw)) {
+          firstAln = String(alnRaw[0] || "N/A").trim();
+        } else if (typeof alnRaw === "string" && alnRaw.length > 0) {
+          firstAln = alnRaw.split(",")[0]?.trim() || "N/A";
+        }
         return {
           id: opp.id,
           number: opp.number,
