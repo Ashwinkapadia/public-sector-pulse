@@ -37,114 +37,22 @@ Deno.serve(async (req) => {
 
     const { action, startDate, endDate, aln, alnPrefixes } = await req.json();
 
-    // ─── Step 1: SAM.gov Assistance Listings ───
+    // ─── Step 1: Grants.gov Discovery ───
     if (action === "discover") {
-      const samApiKey = Deno.env.get("SAM_API_KEY");
-      if (!samApiKey) {
-        return new Response(JSON.stringify({ error: "SAM_API_KEY not configured" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Fetch multiple pages to get comprehensive results
-      const allListings: any[] = [];
-      const pageSize = 100;
-      const maxPages = 5; // Up to 500 results
-      
-      for (let page = 0; page < maxPages; page++) {
-        const offset = page * pageSize;
-        const url = `https://api.sam.gov/assistance-listings/v1/search?api_key=${samApiKey}&publishedDateFrom=${startDate}&publishedDateTo=${endDate}&limit=${pageSize}&offset=${offset}`;
-        if (page === 0) console.log("SAM.gov Assistance Listings request:", url.replace(samApiKey, "***"));
-
-        const response = await fetch(url);
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("SAM.gov error:", errorText);
-          if (page === 0) {
-            return new Response(JSON.stringify({ error: `SAM.gov API error: ${response.status}`, details: errorText }), {
-              status: 502,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-          break; // Use what we have from previous pages
-        }
-
-        const data = await response.json();
-        const listings = data.assistanceListingsData || data.results || [];
-        const pageItems = Array.isArray(listings) ? listings : [];
-        allListings.push(...pageItems);
-        
-        // Stop if we got fewer than requested (no more pages)
-        if (pageItems.length < pageSize) break;
-      }
-      
-      console.log(`SAM.gov total fetched: ${allListings.length} listings`);
-
-      let results = allListings.map((item: any) => ({
-        aln: item.assistanceListingId || item.programNumber || "N/A",
-        title: item.title || item.programTitle || "Untitled",
-        agency: item.organizationName || item.department || "Unknown",
-        link: item.assistanceListingId ? `https://sam.gov/fal/${item.assistanceListingId}/view` : "",
-        postedDate: item.publishedDate || "",
-        closeDate: item.archiveDate || "",
-        type: "Federal Assistance Listing",
-      }));
-
-      const totalBeforeFilter = results.length;
-      let matchedCount = totalBeforeFilter;
-
-      // Instead of filtering out non-matching results (which often leaves 0),
-      // sort matching ALN prefixes to the top and tag them
-      if (alnPrefixes && Array.isArray(alnPrefixes) && alnPrefixes.length > 0) {
-        results = results.map((r: any) => {
-          // ALN can be "93.044" (with dot) or "93044" (no dot) or plain "93"
-          // Extract the agency prefix (digits before the first dot, or the first 2 digits)
-          let prefix = "";
-          if (r.aln && r.aln !== "N/A") {
-            if (r.aln.includes(".")) {
-              prefix = r.aln.split(".")[0];
-            } else if (r.aln.length >= 2) {
-              // Numeric only format like "93044" — first 2 digits are the agency code
-              prefix = r.aln.substring(0, 2);
-            }
-          }
-          console.log(`ALN: ${r.aln} → prefix: ${prefix}, prefixes: [${alnPrefixes.join(",")}], match: ${alnPrefixes.includes(prefix)}`);
-          const isMatch = alnPrefixes.includes(prefix);
-          return { ...r, verticalMatch: isMatch };
-        });
-        // Sort: matches first, then non-matches
-        results.sort((a: any, b: any) => (b.verticalMatch ? 1 : 0) - (a.verticalMatch ? 1 : 0));
-        matchedCount = results.filter((r: any) => r.verticalMatch).length;
-        console.log(`ALN prefix filter [${alnPrefixes.join(",")}]: ${matchedCount} matches of ${totalBeforeFilter} total`);
-      }
-
-      return new Response(JSON.stringify({ results, totalBeforeFilter, matchedCount }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // ─── Step 2: Grants.gov FOA Search ───
-    if (action === "track_grants_gov") {
-      if (!aln) {
-        return new Response(JSON.stringify({ error: "ALN required" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Grants.gov search2 API - no auth required
-      // Build Grants.gov search payload with date filtering
+      // Search Grants.gov directly — no API key needed
       const grantsPayload: any = {
-        rows: 25,
-        aln: aln,
+        rows: 100,
         oppStatuses: "forecasted|posted",
         sortBy: "openDate|desc",
       };
 
-      // Use the user's date range to filter — only show recent opportunities
+      // Apply ALN prefix filter if vertical selected
+      if (alnPrefixes && Array.isArray(alnPrefixes) && alnPrefixes.length > 0) {
+        // Grants.gov supports ALN search — use first prefix as primary filter
+        grantsPayload.aln = alnPrefixes[0];
+      }
+
       if (startDate) {
-        // Grants.gov expects MM/DD/YYYY format
         const sd = new Date(startDate);
         grantsPayload.postedFrom = `${String(sd.getMonth() + 1).padStart(2, "0")}/${String(sd.getDate()).padStart(2, "0")}/${sd.getFullYear()}`;
       }
@@ -153,7 +61,7 @@ Deno.serve(async (req) => {
         grantsPayload.postedTo = `${String(ed.getMonth() + 1).padStart(2, "0")}/${String(ed.getDate()).padStart(2, "0")}/${ed.getFullYear()}`;
       }
 
-      console.log("Grants.gov search payload:", JSON.stringify(grantsPayload));
+      console.log("Grants.gov discover payload:", JSON.stringify(grantsPayload));
 
       const response = await fetch("https://api.grants.gov/v1/api/search2", {
         method: "POST",
@@ -172,24 +80,48 @@ Deno.serve(async (req) => {
 
       const data = await response.json();
       const opportunities = data.data?.oppHits || [];
-      const results = opportunities.map((opp: any) => ({
-        id: opp.id,
-        number: opp.number,
-        title: opp.title,
-        agency: opp.agencyCode || opp.agency || "",
-        openDate: opp.openDate || "",
-        closeDate: opp.closeDate || "",
-        status: opp.oppStatus || "",
-        alnList: opp.alnList || opp.cfdaList || "",
-        link: opp.id ? `https://www.grants.gov/search-results-detail/${opp.id}` : "",
-      }));
 
-      return new Response(JSON.stringify({ results }), {
+      let results = opportunities.map((opp: any) => {
+        const alnRaw = opp.alnList || opp.cfdaList || "";
+        // Extract first ALN from the list
+        const firstAln = alnRaw.split(",")[0]?.trim() || "N/A";
+        return {
+          id: opp.id,
+          number: opp.number,
+          aln: firstAln,
+          title: opp.title || "Untitled",
+          agency: opp.agencyCode || opp.agency || "Unknown",
+          openDate: opp.openDate || "",
+          closeDate: opp.closeDate || "",
+          status: opp.oppStatus || "",
+          link: opp.id ? `https://www.grants.gov/search-results-detail/${opp.id}` : "",
+        };
+      });
+
+      // Tag vertical matches
+      if (alnPrefixes && Array.isArray(alnPrefixes) && alnPrefixes.length > 0) {
+        results = results.map((r: any) => {
+          let prefix = "";
+          if (r.aln && r.aln !== "N/A") {
+            if (r.aln.includes(".")) {
+              prefix = r.aln.split(".")[0];
+            } else if (r.aln.length >= 2) {
+              prefix = r.aln.substring(0, 2);
+            }
+          }
+          const isMatch = alnPrefixes.includes(prefix);
+          return { ...r, verticalMatch: isMatch };
+        });
+        results.sort((a: any, b: any) => (b.verticalMatch ? 1 : 0) - (a.verticalMatch ? 1 : 0));
+      }
+
+      const totalCount = data.data?.totalCount || results.length;
+      return new Response(JSON.stringify({ results, totalCount }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ─── Step 3: USAspending Prime Awards ───
+    // ─── Step 2: USAspending Prime Awards ───
     if (action === "track_prime") {
       if (!aln) {
         return new Response(JSON.stringify({ error: "ALN required" }), {

@@ -11,17 +11,7 @@ export interface DiscoveredGrant {
   verticalMatch?: boolean;
 }
 
-export interface GrantsGovOpportunity {
-  id: string;
-  number: string;
-  title: string;
-  agency: string;
-  openDate: string;
-  closeDate: string;
-  status: string;
-  alnList: string;
-  link: string;
-}
+// GrantsGovOpportunity is now returned as DiscoveredGrant from the discover action
 
 export interface PrimeAward {
   awardId: string;
@@ -58,18 +48,13 @@ const invokeDiscovery = async (body: Record<string, unknown>) => {
 };
 
 export const PulseDiscoveryService = {
-  async discoverNewALNs(startDate: string, endDate: string, alnPrefixes?: string[]): Promise<{ results: DiscoveredGrant[]; totalBeforeFilter?: number }> {
+  async discoverNewALNs(startDate: string, endDate: string, alnPrefixes?: string[]): Promise<{ results: DiscoveredGrant[]; totalCount?: number }> {
     const body: Record<string, unknown> = { action: "discover", startDate, endDate };
     if (alnPrefixes && alnPrefixes.length > 0) {
       body.alnPrefixes = alnPrefixes;
     }
     const data = await invokeDiscovery(body);
-    return { results: data.results || [], totalBeforeFilter: data.totalBeforeFilter };
-  },
-
-  async trackGrantsGov(aln: string, startDate?: string, endDate?: string): Promise<GrantsGovOpportunity[]> {
-    const data = await invokeDiscovery({ action: "track_grants_gov", aln, startDate, endDate });
-    return data.results || [];
+    return { results: data.results || [], totalCount: data.totalCount };
   },
 
   async trackPrimeAwards(aln: string, startDate?: string, endDate?: string): Promise<{ results: PrimeAward[]; totalCount: number }> {
