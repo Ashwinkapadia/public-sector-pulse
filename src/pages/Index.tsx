@@ -737,7 +737,7 @@ const Index = () => {
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div>
                     <label className="text-sm font-medium mb-2 block">
                       Select State
@@ -746,6 +746,20 @@ const Index = () => {
                       value={selectedState}
                       onChange={setSelectedState}
                     />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      ALN / CFDA Number (optional)
+                    </label>
+                    <Input
+                      placeholder="e.g. 93.778 or 10.551,10.561"
+                      value={alnFilter}
+                      onChange={(e) => setAlnFilter(e.target.value)}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Comma-separated for multiple ALNs
+                    </p>
                   </div>
                   <DateRangeSlider
                     startDate={startDate}
