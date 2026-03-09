@@ -367,8 +367,47 @@ async function processData(
       ? new Date(startDate).getFullYear()
       : currentYear;
 
+    // Build filters object
+    const filters: any = {
+      recipient_locations: [
+        {
+          country: "USA",
+          state: state,
+        },
+      ],
+      time_period: [
+        {
+          start_date: startDate || `${fiscalYear}-01-01`,
+          end_date: endDate || `${fiscalYear}-12-31`,
+        },
+      ],
+      // Grant award type codes: 02=Block, 03=Formula, 04=Project, 05=Cooperative Agreement
+      award_type_codes: ["02", "03", "04", "05"],
+      // Filter to government entity recipient types only
+      recipient_type_names: [
+        "Authorities and Commissions",
+        "Local Government",
+        "Regional and State Government",
+        "Interstate Entity",
+        "Indian Native American Tribal Government",
+        "Government",
+        "Regional Organization",
+        "U.S. Territory or Possession",
+        "Council of Governments",
+        "National Government",
+      ],
+    };
+
+    // Add ALN / CFDA filter if provided (must be Array of Strings)
+    if (alnNumber?.trim()) {
+      const alnList = alnNumber.split(",").map(c => c.trim()).filter(c => c.length > 0);
+      if (alnList.length > 0) {
+        filters.program_numbers = alnList;
+        console.log("Filtering by ALN:", alnList);
+      }
+    }
+
     // Search for spending data by state - PRIME AWARDS
-    // Using clean filtering logic: award_type_codes 02-05 for Grants, subawards: false
     const searchResponse = await fetch(
       "https://api.usaspending.gov/api/v2/search/spending_by_award/",
       {
@@ -377,35 +416,7 @@ async function processData(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          filters: {
-            recipient_locations: [
-              {
-                country: "USA",
-                state: state,
-              },
-            ],
-            time_period: [
-              {
-                start_date: startDate || `${fiscalYear}-01-01`,
-                end_date: endDate || `${fiscalYear}-12-31`,
-              },
-            ],
-            // Grant award type codes: 02=Block, 03=Formula, 04=Project, 05=Cooperative Agreement
-            award_type_codes: ["02", "03", "04", "05"],
-            // Filter to government entity recipient types only
-            recipient_type_names: [
-              "Authorities and Commissions",
-              "Local Government",
-              "Regional and State Government",
-              "Interstate Entity",
-              "Indian Native American Tribal Government",
-              "Government",
-              "Regional Organization",
-              "U.S. Territory or Possession",
-              "Council of Governments",
-              "National Government",
-            ],
-          },
+          filters,
           fields: [
             "Award ID",
             "generated_internal_id",
