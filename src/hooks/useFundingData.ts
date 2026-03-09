@@ -86,15 +86,17 @@ export function useFundingRecords(
   state?: string,
   startDate?: Date,
   endDate?: Date,
-  verticalIds?: string[]
+  verticalIds?: string[],
+  alnFilter?: string
 ) {
   // Compute stable date strings for query key and debugging
   const startKey = toDateKey(startDate);
   const endKey = toDateKey(endDate);
   const verticalsKey = verticalIds?.join(",") || "";
+  const alnKey = alnFilter?.trim() || "";
 
   return useQuery({
-    queryKey: ["funding_records", state, startKey, endKey, verticalsKey],
+    queryKey: ["funding_records", state, startKey, endKey, verticalsKey, alnKey],
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: "always",
