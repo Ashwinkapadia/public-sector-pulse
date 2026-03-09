@@ -473,10 +473,12 @@ const Index = () => {
     setStartDate(undefined);
     setEndDate(undefined);
     setSelectedVerticals([]);
+    setAlnFilter("");
     localStorage.removeItem("dashboard_state");
     localStorage.removeItem("dashboard_startDate");
     localStorage.removeItem("dashboard_endDate");
     localStorage.removeItem("dashboard_verticals");
+    localStorage.removeItem("dashboard_aln");
     toast({
       title: "Filters cleared",
       description: "All filters have been reset",
