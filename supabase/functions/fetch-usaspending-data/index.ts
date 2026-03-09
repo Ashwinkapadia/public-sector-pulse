@@ -39,6 +39,7 @@ interface RequestBody {
   startDate?: string;
   endDate?: string;
   sessionId?: string;
+  alnNumber?: string; // optional ALN/CFDA filter, comma-separated
 }
 
 Deno.serve(async (req) => {
