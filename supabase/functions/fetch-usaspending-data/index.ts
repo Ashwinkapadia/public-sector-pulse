@@ -217,6 +217,7 @@ async function processAllStates(
   startDate: string | undefined,
   endDate: string | undefined,
   progressSessionId: string,
+  alnNumber?: string,
 ) {
   try {
     console.log("Starting ALL-states fetch...");
