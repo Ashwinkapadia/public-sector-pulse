@@ -505,8 +505,9 @@ const Index = () => {
       setStartDate(undefined);
       setEndDate(undefined);
       setSelectedVerticals([]);
+      setAlnFilter("");
       setFetchSessionId(null);
-      localStorage.removeItem("dashboard_state");
+      localStorage.removeItem("dashboard_aln");
       localStorage.removeItem("dashboard_startDate");
       localStorage.removeItem("dashboard_endDate");
       localStorage.removeItem("dashboard_verticals");
