@@ -301,7 +301,8 @@ async function processData(
   startDate: string | undefined,
   endDate: string | undefined,
   progressSessionId: string,
-  skipClear = false
+  skipClear = false,
+  alnNumber?: string,
 ): Promise<number> {
   try {
     console.log(`Fetching data for state: ${state}`);
