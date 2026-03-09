@@ -163,7 +163,9 @@ const Index = () => {
     if (endDate) localStorage.setItem("dashboard_endDate", endDate.toISOString());
     else localStorage.removeItem("dashboard_endDate");
     localStorage.setItem("dashboard_verticals", JSON.stringify(selectedVerticals));
-  }, [selectedState, startDate, endDate, selectedVerticals]);
+    if (alnFilter) localStorage.setItem("dashboard_aln", alnFilter);
+    else localStorage.removeItem("dashboard_aln");
+  }, [selectedState, startDate, endDate, selectedVerticals, alnFilter]);
 
   const invokeWithAuth = async <T = any>(
     functionName: string,
