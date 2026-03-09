@@ -148,6 +148,16 @@ export function useFundingRecords(
           query = query.in("vertical_id", verticalIds);
         }
 
+        // Filter by ALN / CFDA code
+        if (alnKey) {
+          const alnList = alnKey.split(",").map(a => a.trim()).filter(a => a.length > 0);
+          if (alnList.length === 1) {
+            query = query.eq("cfda_code", alnList[0]);
+          } else if (alnList.length > 1) {
+            query = query.in("cfda_code", alnList);
+          }
+        }
+
         const { data, error } = await query;
         if (error) throw error;
 
