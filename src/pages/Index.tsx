@@ -39,6 +39,9 @@ const Index = () => {
     const saved = localStorage.getItem("dashboard_verticals");
     return saved ? JSON.parse(saved) : [];
   });
+  const [alnFilter, setAlnFilter] = useState<string>(() => {
+    return localStorage.getItem("dashboard_aln") || "";
+  });
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [fetching, setFetching] = useState(false);
