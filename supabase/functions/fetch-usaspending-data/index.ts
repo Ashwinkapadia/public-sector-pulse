@@ -253,6 +253,7 @@ async function processAllStates(
         endDate,
         progressSessionId,
         true,
+        alnNumber,
       );
 
       totalPrimeAwards += recordsAdded;
