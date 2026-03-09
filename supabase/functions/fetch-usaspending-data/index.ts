@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { state, startDate, endDate, sessionId } = await req.json() as RequestBody & { sessionId?: string };
+    const { state, startDate, endDate, sessionId, alnNumber } = await req.json() as RequestBody;
 
     if (!state) {
       return new Response(
