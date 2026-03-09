@@ -771,7 +771,7 @@ const Index = () => {
 
                 {/* Debug: show what the UI thinks the filters are */}
                 <div className="mt-4 text-xs text-muted-foreground">
-                  Active filters: state={selectedState || "(none)"} • start=
+                  Active filters: state={selectedState || "(none)"} • ALN={alnFilter || "(none)"} • start=
                   {startDate ? format(startDate, "yyyy-MM-dd") : "(none)"} • end=
                   {endDate ? format(endDate, "yyyy-MM-dd") : "(none)"} • verticals=
                   {selectedVerticals.length}
