@@ -251,6 +251,7 @@ const Index = () => {
         state: selectedState,
         startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
         endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
+        alnNumber: alnFilter.trim() || undefined,
         sessionId,
       });
 
