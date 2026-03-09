@@ -135,9 +135,9 @@ Deno.serve(async (req) => {
 
     // Start background task for heavy processing
     if (state === "ALL") {
-      EdgeRuntime.waitUntil(processAllStates(supabaseClient, startDate, endDate, progressSessionId));
+      EdgeRuntime.waitUntil(processAllStates(supabaseClient, startDate, endDate, progressSessionId, alnNumber));
     } else {
-      EdgeRuntime.waitUntil(processData(supabaseClient, state, startDate, endDate, progressSessionId));
+      EdgeRuntime.waitUntil(processData(supabaseClient, state, startDate, endDate, progressSessionId, false, alnNumber));
     }
 
     // Return immediately with session ID
