@@ -152,7 +152,7 @@ const Index = () => {
     }, 200);
 
     return () => window.clearTimeout(t);
-  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals]);
+  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals, alnFilter]);
 
   // Persist filters to localStorage so they survive page refresh
   useEffect(() => {
