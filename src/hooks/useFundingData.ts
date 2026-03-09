@@ -182,14 +182,16 @@ export function useFundingMetrics(
   state?: string,
   startDate?: Date,
   endDate?: Date,
-  verticalIds?: string[]
+  verticalIds?: string[],
+  alnFilter?: string
 ) {
   const startKey = toDateKey(startDate);
   const endKey = toDateKey(endDate);
   const verticalsKey = verticalIds?.join(",") || "";
+  const alnKey = alnFilter?.trim() || "";
 
   return useQuery({
-    queryKey: ["funding_metrics", state, startKey, endKey, verticalsKey],
+    queryKey: ["funding_metrics", state, startKey, endKey, verticalsKey, alnKey],
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: "always",
