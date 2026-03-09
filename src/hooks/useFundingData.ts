@@ -221,6 +221,16 @@ export function useFundingMetrics(
           fundingQuery = fundingQuery.in("vertical_id", verticalIds);
         }
 
+        // Filter by ALN / CFDA code
+        if (alnKey) {
+          const alnList = alnKey.split(",").map(a => a.trim()).filter(a => a.length > 0);
+          if (alnList.length === 1) {
+            fundingQuery = fundingQuery.eq("cfda_code", alnList[0]);
+          } else if (alnList.length > 1) {
+            fundingQuery = fundingQuery.in("cfda_code", alnList);
+          }
+        }
+
         const { data } = await fundingQuery;
         const rows = data || [];
         allData = allData.concat(rows);
