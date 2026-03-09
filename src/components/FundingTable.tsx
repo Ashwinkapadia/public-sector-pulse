@@ -26,14 +26,15 @@ interface FundingTableProps {
   verticalIds?: string[];
   startDate?: Date;
   endDate?: Date;
+  alnFilter?: string;
 }
 
 type SortField = "organization" | "vertical" | "funding" | "status" | "awardDate" | "source";
 type SortOrder = "asc" | "desc";
 
-export function FundingTable({ state, verticalIds, startDate, endDate }: FundingTableProps) {
+export function FundingTable({ state, verticalIds, startDate, endDate, alnFilter }: FundingTableProps) {
   // Now passes verticalIds to the hook so filtering happens server-side
-  const { data: fundingRecords, isLoading } = useFundingRecords(state, startDate, endDate, verticalIds);
+  const { data: fundingRecords, isLoading } = useFundingRecords(state, startDate, endDate, verticalIds, alnFilter);
   const { data: assignments } = useRepAssignments();
   const [sortField, setSortField] = useState<SortField>("funding");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");

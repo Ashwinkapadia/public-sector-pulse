@@ -86,15 +86,17 @@ export function useFundingRecords(
   state?: string,
   startDate?: Date,
   endDate?: Date,
-  verticalIds?: string[]
+  verticalIds?: string[],
+  alnFilter?: string
 ) {
   // Compute stable date strings for query key and debugging
   const startKey = toDateKey(startDate);
   const endKey = toDateKey(endDate);
   const verticalsKey = verticalIds?.join(",") || "";
+  const alnKey = alnFilter?.trim() || "";
 
   return useQuery({
-    queryKey: ["funding_records", state, startKey, endKey, verticalsKey],
+    queryKey: ["funding_records", state, startKey, endKey, verticalsKey, alnKey],
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: "always",
@@ -146,6 +148,16 @@ export function useFundingRecords(
           query = query.in("vertical_id", verticalIds);
         }
 
+        // Filter by ALN / CFDA code
+        if (alnKey) {
+          const alnList = alnKey.split(",").map(a => a.trim()).filter(a => a.length > 0);
+          if (alnList.length === 1) {
+            query = query.eq("cfda_code", alnList[0]);
+          } else if (alnList.length > 1) {
+            query = query.in("cfda_code", alnList);
+          }
+        }
+
         const { data, error } = await query;
         if (error) throw error;
 
@@ -170,14 +182,16 @@ export function useFundingMetrics(
   state?: string,
   startDate?: Date,
   endDate?: Date,
-  verticalIds?: string[]
+  verticalIds?: string[],
+  alnFilter?: string
 ) {
   const startKey = toDateKey(startDate);
   const endKey = toDateKey(endDate);
   const verticalsKey = verticalIds?.join(",") || "";
+  const alnKey = alnFilter?.trim() || "";
 
   return useQuery({
-    queryKey: ["funding_metrics", state, startKey, endKey, verticalsKey],
+    queryKey: ["funding_metrics", state, startKey, endKey, verticalsKey, alnKey],
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: "always",
@@ -205,6 +219,16 @@ export function useFundingMetrics(
 
         if (verticalIds && verticalIds.length > 0) {
           fundingQuery = fundingQuery.in("vertical_id", verticalIds);
+        }
+
+        // Filter by ALN / CFDA code
+        if (alnKey) {
+          const alnList = alnKey.split(",").map(a => a.trim()).filter(a => a.length > 0);
+          if (alnList.length === 1) {
+            fundingQuery = fundingQuery.eq("cfda_code", alnList[0]);
+          } else if (alnList.length > 1) {
+            fundingQuery = fundingQuery.in("cfda_code", alnList);
+          }
         }
 
         const { data } = await fundingQuery;

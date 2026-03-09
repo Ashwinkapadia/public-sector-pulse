@@ -17,11 +17,12 @@ interface FundingChartProps {
   startDate?: Date;
   endDate?: Date;
   verticalIds?: string[];
+  alnFilter?: string;
 }
 
-export function FundingChart({ state, startDate, endDate, verticalIds }: FundingChartProps) {
+export function FundingChart({ state, startDate, endDate, verticalIds, alnFilter }: FundingChartProps) {
   // Now passes verticalIds so the chart only fetches data for selected verticals
-  const { data: fundingRecords, isLoading: loadingRecords } = useFundingRecords(state, startDate, endDate, verticalIds);
+  const { data: fundingRecords, isLoading: loadingRecords } = useFundingRecords(state, startDate, endDate, verticalIds, alnFilter);
   const { data: verticals, isLoading: loadingVerticals } = useVerticals();
 
   const chartData = useMemo(() => {

@@ -39,6 +39,9 @@ const Index = () => {
     const saved = localStorage.getItem("dashboard_verticals");
     return saved ? JSON.parse(saved) : [];
   });
+  const [alnFilter, setAlnFilter] = useState<string>(() => {
+    return localStorage.getItem("dashboard_aln") || "";
+  });
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -149,7 +152,7 @@ const Index = () => {
     }, 200);
 
     return () => window.clearTimeout(t);
-  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals]);
+  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals, alnFilter]);
 
   // Persist filters to localStorage so they survive page refresh
   useEffect(() => {
@@ -160,7 +163,9 @@ const Index = () => {
     if (endDate) localStorage.setItem("dashboard_endDate", endDate.toISOString());
     else localStorage.removeItem("dashboard_endDate");
     localStorage.setItem("dashboard_verticals", JSON.stringify(selectedVerticals));
-  }, [selectedState, startDate, endDate, selectedVerticals]);
+    if (alnFilter) localStorage.setItem("dashboard_aln", alnFilter);
+    else localStorage.removeItem("dashboard_aln");
+  }, [selectedState, startDate, endDate, selectedVerticals, alnFilter]);
 
   const invokeWithAuth = async <T = any>(
     functionName: string,
@@ -246,6 +251,7 @@ const Index = () => {
         state: selectedState,
         startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
         endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
+        alnNumber: alnFilter.trim() || undefined,
         sessionId,
       });
 
@@ -467,10 +473,12 @@ const Index = () => {
     setStartDate(undefined);
     setEndDate(undefined);
     setSelectedVerticals([]);
+    setAlnFilter("");
     localStorage.removeItem("dashboard_state");
     localStorage.removeItem("dashboard_startDate");
     localStorage.removeItem("dashboard_endDate");
     localStorage.removeItem("dashboard_verticals");
+    localStorage.removeItem("dashboard_aln");
     toast({
       title: "Filters cleared",
       description: "All filters have been reset",
@@ -497,8 +505,9 @@ const Index = () => {
       setStartDate(undefined);
       setEndDate(undefined);
       setSelectedVerticals([]);
+      setAlnFilter("");
       setFetchSessionId(null);
-      localStorage.removeItem("dashboard_state");
+      localStorage.removeItem("dashboard_aln");
       localStorage.removeItem("dashboard_startDate");
       localStorage.removeItem("dashboard_endDate");
       localStorage.removeItem("dashboard_verticals");
@@ -729,7 +738,7 @@ const Index = () => {
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div>
                     <label className="text-sm font-medium mb-2 block">
                       Select State
@@ -738,6 +747,20 @@ const Index = () => {
                       value={selectedState}
                       onChange={setSelectedState}
                     />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      ALN / CFDA Number (optional)
+                    </label>
+                    <Input
+                      placeholder="e.g. 93.778 or 10.551,10.561"
+                      value={alnFilter}
+                      onChange={(e) => setAlnFilter(e.target.value)}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Comma-separated for multiple ALNs
+                    </p>
                   </div>
                   <DateRangeSlider
                     startDate={startDate}
@@ -749,7 +772,7 @@ const Index = () => {
 
                 {/* Debug: show what the UI thinks the filters are */}
                 <div className="mt-4 text-xs text-muted-foreground">
-                  Active filters: state={selectedState || "(none)"} • start=
+                  Active filters: state={selectedState || "(none)"} • ALN={alnFilter || "(none)"} • start=
                   {startDate ? format(startDate, "yyyy-MM-dd") : "(none)"} • end=
                   {endDate ? format(endDate, "yyyy-MM-dd") : "(none)"} • verticals=
                   {selectedVerticals.length}
@@ -835,18 +858,18 @@ const Index = () => {
 
             {/* Metrics Overview */}
             <section className="mb-8">
-              <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} />
+              <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} alnFilter={alnFilter} />
             </section>
 
             {/* Funding Chart */}
             <section className="mb-8">
-              <FundingChart state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} />
+              <FundingChart state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} alnFilter={alnFilter} />
             </section>
 
             {/* Prime Awards Table */}
             <section className="mb-8">
               <h2 className="text-lg font-semibold text-foreground mb-4">Prime Awards</h2>
-              <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} />
+              <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} alnFilter={alnFilter} />
             </section>
 
             {/* Subawards Table */}
