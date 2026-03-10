@@ -196,7 +196,7 @@ export function useFundingMetrics(
     gcTime: 0,
     refetchOnMount: "always",
     queryFn: async () => {
-      console.log("[useFundingMetrics] Fetching", { state, startKey, endKey, verticalsKey });
+      console.log("[useFundingMetrics] Fetching", { state, startKey, endKey, verticalsKey, alnKey });
 
       // Paginate to get ALL records (same issue as useFundingRecords)
       const PAGE_SIZE = 1000;
