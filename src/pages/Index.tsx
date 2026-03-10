@@ -869,7 +869,7 @@ const Index = () => {
 
             {/* Metrics Overview */}
             <section className="mb-8">
-              <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} alnFilter={alnFilter} />
+              <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} alnFilter={debouncedAlnFilter} />
             </section>
 
             {/* Funding Chart */}
