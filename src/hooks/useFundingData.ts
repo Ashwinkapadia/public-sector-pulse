@@ -159,7 +159,10 @@ export function useFundingRecords(
         }
 
         const { data, error } = await query;
-        if (error) throw error;
+        if (error) {
+          console.error("[useFundingRecords] Supabase error:", error);
+          throw error;
+        }
 
         const rows = (data || []) as FundingRecord[];
         allData = allData.concat(rows);
