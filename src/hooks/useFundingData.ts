@@ -172,7 +172,7 @@ export function useFundingRecords(
         if (page > 20) break;
       }
 
-      console.log(`[useFundingRecords] Total records fetched: ${allData.length} across ${page} pages`);
+      console.log(`[useFundingRecords] Total records fetched: ${allData.length} across ${page} pages (alnKey=${alnKey})`);
       return allData;
     },
   });
