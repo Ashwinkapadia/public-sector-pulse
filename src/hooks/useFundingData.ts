@@ -101,7 +101,7 @@ export function useFundingRecords(
     gcTime: 0,
     refetchOnMount: "always",
     queryFn: async () => {
-      console.log("[useFundingRecords] Fetching", { state, startKey, endKey, verticalsKey, alnKey });
+      console.log("[useFundingRecords] queryFn EXECUTING with", { state, startKey, endKey, verticalsKey, alnKey });
 
       // Supabase defaults to 1000 rows max. We need to fetch ALL matching records
       // by paginating through the results.
@@ -159,7 +159,10 @@ export function useFundingRecords(
         }
 
         const { data, error } = await query;
-        if (error) throw error;
+        if (error) {
+          console.error("[useFundingRecords] Supabase error:", error);
+          throw error;
+        }
 
         const rows = (data || []) as FundingRecord[];
         allData = allData.concat(rows);

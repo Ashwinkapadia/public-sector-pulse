@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +42,17 @@ const Index = () => {
   const [alnFilter, setAlnFilter] = useState<string>(() => {
     return localStorage.getItem("dashboard_aln") || "";
   });
+  // Debounce ALN filter to avoid firing queries on every keystroke
+  const [debouncedAlnFilter, setDebouncedAlnFilter] = useState<string>(alnFilter);
+  const alnDebounceRef = useRef<number>();
+  useEffect(() => {
+    if (alnDebounceRef.current) window.clearTimeout(alnDebounceRef.current);
+    alnDebounceRef.current = window.setTimeout(() => {
+      console.log("[ALN Debounce] Setting debounced value:", alnFilter);
+      setDebouncedAlnFilter(alnFilter);
+    }, 600);
+    return () => { if (alnDebounceRef.current) window.clearTimeout(alnDebounceRef.current); };
+  }, [alnFilter]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -152,7 +163,7 @@ const Index = () => {
     }, 200);
 
     return () => window.clearTimeout(t);
-  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals, alnFilter]);
+  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals, debouncedAlnFilter]);
 
   // Persist filters to localStorage so they survive page refresh
   useEffect(() => {
@@ -858,18 +869,18 @@ const Index = () => {
 
             {/* Metrics Overview */}
             <section className="mb-8">
-              <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} alnFilter={alnFilter} />
+              <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} alnFilter={debouncedAlnFilter} />
             </section>
 
             {/* Funding Chart */}
             <section className="mb-8">
-              <FundingChart state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} alnFilter={alnFilter} />
+              <FundingChart state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} alnFilter={debouncedAlnFilter} />
             </section>
 
             {/* Prime Awards Table */}
             <section className="mb-8">
               <h2 className="text-lg font-semibold text-foreground mb-4">Prime Awards</h2>
-              <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} alnFilter={alnFilter} />
+              <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} alnFilter={debouncedAlnFilter} />
             </section>
 
             {/* Subawards Table */}
