@@ -42,6 +42,17 @@ const Index = () => {
   const [alnFilter, setAlnFilter] = useState<string>(() => {
     return localStorage.getItem("dashboard_aln") || "";
   });
+  // Debounce ALN filter to avoid firing queries on every keystroke
+  const [debouncedAlnFilter, setDebouncedAlnFilter] = useState<string>(alnFilter);
+  const alnDebounceRef = useRef<number>();
+  useEffect(() => {
+    if (alnDebounceRef.current) window.clearTimeout(alnDebounceRef.current);
+    alnDebounceRef.current = window.setTimeout(() => {
+      console.log("[ALN Debounce] Setting debounced value:", alnFilter);
+      setDebouncedAlnFilter(alnFilter);
+    }, 600);
+    return () => { if (alnDebounceRef.current) window.clearTimeout(alnDebounceRef.current); };
+  }, [alnFilter]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [fetching, setFetching] = useState(false);
