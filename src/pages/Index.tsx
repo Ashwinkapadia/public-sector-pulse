@@ -880,7 +880,7 @@ const Index = () => {
             {/* Prime Awards Table */}
             <section className="mb-8">
               <h2 className="text-lg font-semibold text-foreground mb-4">Prime Awards</h2>
-              <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} alnFilter={alnFilter} />
+              <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} alnFilter={debouncedAlnFilter} />
             </section>
 
             {/* Subawards Table */}
