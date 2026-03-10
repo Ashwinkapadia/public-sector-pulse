@@ -101,7 +101,7 @@ export function useFundingRecords(
     gcTime: 0,
     refetchOnMount: "always",
     queryFn: async () => {
-      console.log("[useFundingRecords] Fetching", { state, startKey, endKey, verticalsKey });
+      console.log("[useFundingRecords] Fetching", { state, startKey, endKey, verticalsKey, alnKey });
 
       // Supabase defaults to 1000 rows max. We need to fetch ALL matching records
       // by paginating through the results.
@@ -172,7 +172,7 @@ export function useFundingRecords(
         if (page > 20) break;
       }
 
-      console.log(`[useFundingRecords] Total records fetched: ${allData.length} across ${page} pages`);
+      console.log(`[useFundingRecords] Total records fetched: ${allData.length} across ${page} pages (alnKey=${alnKey})`);
       return allData;
     },
   });
@@ -196,7 +196,7 @@ export function useFundingMetrics(
     gcTime: 0,
     refetchOnMount: "always",
     queryFn: async () => {
-      console.log("[useFundingMetrics] Fetching", { state, startKey, endKey, verticalsKey });
+      console.log("[useFundingMetrics] Fetching", { state, startKey, endKey, verticalsKey, alnKey });
 
       // Paginate to get ALL records (same issue as useFundingRecords)
       const PAGE_SIZE = 1000;
