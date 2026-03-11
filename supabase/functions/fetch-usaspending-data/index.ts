@@ -16,15 +16,12 @@ function normalizeDateToYmd(input: unknown): string | null {
   if (typeof input !== "string") return null;
   const s = input.trim();
   if (!s) return null;
-  // USAspending dates are generally YYYY-MM-DD, but can include time.
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split("T")[0];
-  // Fallback: attempt parse and convert to YYYY-MM-DD.
   const d = new Date(s);
   if (!Number.isNaN(d.getTime())) return d.toISOString().split("T")[0];
   return null;
 }
 
-// Helper function to format currency
 const formatAmount = (amount: number) => {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -35,11 +32,27 @@ const formatAmount = (amount: number) => {
 };
 
 interface RequestBody {
-  state: string; // two-letter state code or "ALL"
+  state: string;
   startDate?: string;
   endDate?: string;
   sessionId?: string;
-  alnNumber?: string; // optional ALN/CFDA filter, comma-separated
+  alnNumber?: string;
+}
+
+// Helper to update progress with a consistent shape
+async function updateProgress(
+  supabaseClient: any,
+  sessionId: string,
+  updates: Record<string, any>,
+) {
+  try {
+    await supabaseClient
+      .from("fetch_progress")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("session_id", sessionId);
+  } catch (e) {
+    console.error("Progress update failed:", e);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -48,7 +61,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify authentication (signing-keys compatible)
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -59,7 +71,6 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "").trim();
 
-    // Create client with anon key to verify the JWT via signing-keys
     const authClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
@@ -79,7 +90,6 @@ Deno.serve(async (req) => {
 
     const userId = claimsData.claims.sub;
 
-    // Verify admin role
     const { data: roleData, error: roleError } = await authClient
       .from("user_roles")
       .select("role")
@@ -106,13 +116,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use service role client only after confirming admin privileges
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Create progress tracking session
     const progressSessionId = sessionId || crypto.randomUUID();
     
     const { error: progressError } = await supabaseClient
@@ -122,7 +130,18 @@ Deno.serve(async (req) => {
         state,
         source: "USAspending.gov",
         status: "running",
-        message: "Starting fetch...",
+        message: JSON.stringify({
+          phase: "init",
+          phaseLabel: "Initializing",
+          apiPagesTotal: 0,
+          apiPagesFetched: 0,
+          apiResultsTotal: 0,
+          recordsPrepared: 0,
+          recordsInserted: 0,
+          recordsTotal: 0,
+          errors: [],
+          startedAt: new Date().toISOString(),
+        }),
         total_pages: 0,
         current_page: 0,
         records_inserted: 0,
@@ -133,14 +152,12 @@ Deno.serve(async (req) => {
       console.error("Error creating progress:", progressError);
     }
 
-    // Start background task for heavy processing
     if (state === "ALL") {
       EdgeRuntime.waitUntil(processAllStates(supabaseClient, startDate, endDate, progressSessionId, alnNumber));
     } else {
       EdgeRuntime.waitUntil(processData(supabaseClient, state, startDate, endDate, progressSessionId, false, alnNumber));
     }
 
-    // Return immediately with session ID
     return new Response(
       JSON.stringify({
         success: true,
@@ -175,7 +192,6 @@ const US_STATE_CODES = [
 
 type UsStateCode = (typeof US_STATE_CODES)[number];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function clearAllUsaspendingData(supabaseClient: any) {
   const { data: fundingToClear, error: fundingSelectError } = await supabaseClient
     .from("funding_records")
@@ -211,7 +227,6 @@ async function clearAllUsaspendingData(supabaseClient: any) {
   console.log(`Cleared ${fundingIdsToClear.length} existing USAspending.gov records (ALL states)`);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function processAllStates(
   supabaseClient: any,
   startDate: string | undefined,
@@ -219,32 +234,55 @@ async function processAllStates(
   progressSessionId: string,
   alnNumber?: string,
 ) {
+  const startedAt = new Date().toISOString();
   try {
     console.log("Starting ALL-states fetch...");
 
-    await supabaseClient
-      .from("fetch_progress")
-      .update({
-        total_pages: US_STATE_CODES.length,
-        current_page: 0,
-        message: `Clearing existing USAspending.gov data...`,
-      })
-      .eq("session_id", progressSessionId);
+    await updateProgress(supabaseClient, progressSessionId, {
+      message: JSON.stringify({
+        phase: "clearing",
+        phaseLabel: "Clearing existing data",
+        apiPagesTotal: 0,
+        apiPagesFetched: 0,
+        apiResultsTotal: 0,
+        recordsPrepared: 0,
+        recordsInserted: 0,
+        recordsTotal: 0,
+        statesTotal: US_STATE_CODES.length,
+        statesCompleted: 0,
+        errors: [],
+        startedAt,
+      }),
+      total_pages: US_STATE_CODES.length,
+      current_page: 0,
+    });
 
     await clearAllUsaspendingData(supabaseClient);
 
     let totalPrimeAwards = 0;
+    const errors: string[] = [];
 
     for (let i = 0; i < US_STATE_CODES.length; i++) {
       const state = US_STATE_CODES[i] as UsStateCode;
 
-      await supabaseClient
-        .from("fetch_progress")
-        .update({
-          current_page: i + 1,
-          message: `Fetching ${state} (${i + 1}/${US_STATE_CODES.length})...`,
-        })
-        .eq("session_id", progressSessionId);
+      await updateProgress(supabaseClient, progressSessionId, {
+        current_page: i + 1,
+        message: JSON.stringify({
+          phase: "fetching_state",
+          phaseLabel: `Fetching ${state} (${i + 1}/${US_STATE_CODES.length})`,
+          apiPagesTotal: 0,
+          apiPagesFetched: 0,
+          apiResultsTotal: 0,
+          recordsPrepared: 0,
+          recordsInserted: totalPrimeAwards,
+          recordsTotal: 0,
+          statesTotal: US_STATE_CODES.length,
+          statesCompleted: i,
+          currentState: state,
+          errors,
+          startedAt,
+        }),
+      });
 
       const recordsAdded = await processData(
         supabaseClient,
@@ -258,43 +296,56 @@ async function processAllStates(
 
       totalPrimeAwards += recordsAdded;
 
-      // Update aggregate progress
-      await supabaseClient
-        .from("fetch_progress")
-        .update({
-          records_inserted: totalPrimeAwards,
-          message: `Fetched ${state}. Total prime awards inserted: ${totalPrimeAwards}`,
-        })
-        .eq("session_id", progressSessionId);
+      await updateProgress(supabaseClient, progressSessionId, {
+        records_inserted: totalPrimeAwards,
+        message: JSON.stringify({
+          phase: "fetching_state",
+          phaseLabel: `Completed ${state}`,
+          apiPagesTotal: 0,
+          apiPagesFetched: 0,
+          apiResultsTotal: 0,
+          recordsPrepared: 0,
+          recordsInserted: totalPrimeAwards,
+          recordsTotal: 0,
+          statesTotal: US_STATE_CODES.length,
+          statesCompleted: i + 1,
+          currentState: state,
+          errors,
+          startedAt,
+        }),
+      });
     }
 
-    await supabaseClient
-      .from("fetch_progress")
-      .update({
-        status: "completed",
-        message: `Completed ALL states! Inserted ${totalPrimeAwards} prime awards total.`,
-      })
-      .eq("session_id", progressSessionId);
+    await updateProgress(supabaseClient, progressSessionId, {
+      status: "completed",
+      records_inserted: totalPrimeAwards,
+      message: JSON.stringify({
+        phase: "completed",
+        phaseLabel: `Completed! Inserted ${totalPrimeAwards} prime awards across all states.`,
+        recordsInserted: totalPrimeAwards,
+        statesTotal: US_STATE_CODES.length,
+        statesCompleted: US_STATE_CODES.length,
+        errors,
+        startedAt,
+        completedAt: new Date().toISOString(),
+      }),
+    });
   } catch (error) {
     console.error("Error in ALL-states processing:", error);
-
-    try {
-      await supabaseClient
-        .from("fetch_progress")
-        .update({
-          status: "failed",
-          message: error instanceof Error ? error.message : "Unknown error",
-          errors: [error instanceof Error ? error.message : "Unknown error"],
-        })
-        .eq("session_id", progressSessionId);
-    } catch (updateError) {
-      console.error("Error updating progress:", updateError);
-    }
+    await updateProgress(supabaseClient, progressSessionId, {
+      status: "failed",
+      errors: [error instanceof Error ? error.message : "Unknown error"],
+      message: JSON.stringify({
+        phase: "failed",
+        phaseLabel: error instanceof Error ? error.message : "Unknown error",
+        errors: [error instanceof Error ? error.message : "Unknown error"],
+        startedAt,
+      }),
+    });
   }
 }
 
 // Background processing function
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function processData(
   supabaseClient: any,
   state: string,
@@ -304,12 +355,42 @@ async function processData(
   skipClear = false,
   alnNumber?: string,
 ): Promise<number> {
+  // Read existing progress to get startedAt
+  let startedAt = new Date().toISOString();
+  try {
+    const { data: existingProgress } = await supabaseClient
+      .from("fetch_progress")
+      .select("message")
+      .eq("session_id", progressSessionId)
+      .single();
+    if (existingProgress?.message) {
+      try {
+        const parsed = JSON.parse(existingProgress.message);
+        if (parsed.startedAt) startedAt = parsed.startedAt;
+      } catch {}
+    }
+  } catch {}
+
   try {
     console.log(`Fetching data for state: ${state}`);
 
-    // Clear existing USAspending.gov data before fetching new data
+    // --- CLEAR PHASE ---
     if (!skipClear) {
-      // First, get all organizations for this state
+      await updateProgress(supabaseClient, progressSessionId, {
+        message: JSON.stringify({
+          phase: "clearing",
+          phaseLabel: `Clearing existing ${state} data...`,
+          apiPagesTotal: 0,
+          apiPagesFetched: 0,
+          apiResultsTotal: 0,
+          recordsPrepared: 0,
+          recordsInserted: 0,
+          recordsTotal: 0,
+          errors: [],
+          startedAt,
+        }),
+      });
+
       const { data: orgsForState, error: orgsError } = await supabaseClient
         .from("organizations")
         .select("id")
@@ -321,7 +402,6 @@ async function processData(
 
       const orgIdsForState = (orgsForState || []).map((org: any) => org.id);
 
-      // Only delete funding records from USAspending.gov for this state
       if (orgIdsForState.length > 0) {
         const { data: fundingToClear, error: fundingSelectError } = await supabaseClient
           .from("funding_records")
@@ -335,7 +415,6 @@ async function processData(
           const fundingIdsToClear = (fundingToClear || []).map((fr: any) => fr.id);
 
           if (fundingIdsToClear.length > 0) {
-            // Delete subawards first
             const { error: subawardsDeleteError } = await supabaseClient
               .from("subawards")
               .delete()
@@ -345,7 +424,6 @@ async function processData(
               console.error("Error deleting existing subawards:", subawardsDeleteError);
             }
 
-            // Delete funding records
             const { error: fundingDeleteError } = await supabaseClient
               .from("funding_records")
               .delete()
@@ -361,13 +439,12 @@ async function processData(
       }
     }
 
-    // Get current fiscal year
+    // --- API FETCH PHASE ---
     const currentYear = new Date().getFullYear();
     const fiscalYear = startDate
       ? new Date(startDate).getFullYear()
       : currentYear;
 
-    // Build filters object
     const filters: any = {
       recipient_locations: [
         {
@@ -381,9 +458,7 @@ async function processData(
           end_date: endDate || `${fiscalYear}-12-31`,
         },
       ],
-      // Grant award type codes: 02=Block, 03=Formula, 04=Project, 05=Cooperative Agreement
       award_type_codes: ["02", "03", "04", "05"],
-      // Filter to government entity recipient types only
       recipient_type_names: [
         "Authorities and Commissions",
         "Local Government",
@@ -398,7 +473,6 @@ async function processData(
       ],
     };
 
-    // Add ALN / CFDA filter if provided (must be Array of Strings)
     if (alnNumber?.trim()) {
       const alnList = alnNumber.split(",").map(c => c.trim()).filter(c => c.length > 0);
       if (alnList.length > 0) {
@@ -407,33 +481,47 @@ async function processData(
       }
     }
 
-    // Search for spending data by state - PRIME AWARDS
+    await updateProgress(supabaseClient, progressSessionId, {
+      message: JSON.stringify({
+        phase: "api_fetch",
+        phaseLabel: `Fetching page 1 from USAspending API...`,
+        apiPagesTotal: 0,
+        apiPagesFetched: 0,
+        apiResultsTotal: 0,
+        recordsPrepared: 0,
+        recordsInserted: 0,
+        recordsTotal: 0,
+        errors: [],
+        startedAt,
+      }),
+    });
+
+    const apiFields = [
+      "Award ID",
+      "generated_internal_id",
+      "Recipient Name",
+      "Recipient Location",
+      "Award Amount",
+      "Award Type",
+      "Awarding Agency",
+      "Awarding Sub Agency",
+      "Start Date",
+      "End Date",
+      "Action Date",
+      "Description",
+      "CFDA Number",
+      "Assistance Listings",
+    ];
+
     const searchResponse = await fetch(
       "https://api.usaspending.gov/api/v2/search/spending_by_award/",
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           filters,
-          fields: [
-            "Award ID",
-            "generated_internal_id",
-            "Recipient Name",
-            "Recipient Location",
-            "Award Amount",
-            "Award Type",
-            "Awarding Agency",
-            "Awarding Sub Agency",
-            "Start Date",
-            "End Date",
-            "Action Date",
-            "Description",
-            "CFDA Number",
-            "Assistance Listings",
-          ],
-          subawards: false, // Explicitly Prime Awards only
+          fields: apiFields,
+          subawards: false,
           limit: 100,
           page: 1,
           order: "desc",
@@ -452,23 +540,28 @@ async function processData(
     const page1Results = searchData.results || [];
     console.log(`Found ${page1Results.length} results from page 1`);
 
-    // Fetch additional pages ONLY while more data exists
     let allResults = page1Results;
     let currentHasNext = searchData.page_metadata?.hasNext ?? false;
-    const maxPages = 10; // hard cap to prevent runaway fetches
-    let actualTotalPages = 1;
+    const maxPages = 10;
+    let apiPagesFetched = 1;
 
-    // Update progress with initial info (we don't know true total yet)
-    await supabaseClient
-      .from("fetch_progress")
-      .update({
-        total_pages: currentHasNext ? maxPages : 1, // estimate; will update as we go
-        current_page: 1,
-        message: `Processing page 1...`,
-      })
-      .eq("session_id", progressSessionId);
+    await updateProgress(supabaseClient, progressSessionId, {
+      total_pages: 1,
+      current_page: 1,
+      message: JSON.stringify({
+        phase: "api_fetch",
+        phaseLabel: `Fetched page 1 (${page1Results.length} results)${currentHasNext ? ', fetching more...' : ''}`,
+        apiPagesTotal: currentHasNext ? '?' : 1,
+        apiPagesFetched: 1,
+        apiResultsTotal: allResults.length,
+        recordsPrepared: 0,
+        recordsInserted: 0,
+        recordsTotal: 0,
+        errors: [],
+        startedAt,
+      }),
+    });
 
-    // Dynamically fetch more pages only if hasNext is true and page returns data
     let page = 2;
     while (currentHasNext && page <= maxPages) {
       const pageResponse = await fetch(
@@ -478,22 +571,7 @@ async function processData(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             filters,
-            fields: [
-              "Award ID",
-              "generated_internal_id",
-              "Recipient Name",
-              "Recipient Location",
-              "Award Amount",
-              "Award Type",
-              "Awarding Agency",
-              "Awarding Sub Agency",
-              "Start Date",
-              "End Date",
-              "Action Date",
-              "Description",
-              "CFDA Number",
-              "Assistance Listings",
-            ],
+            fields: apiFields,
             subawards: false,
             limit: 100,
             page: page,
@@ -513,44 +591,53 @@ async function processData(
       console.log(`Found ${pageResults.length} results from page ${page}`);
 
       if (pageResults.length === 0) {
-        // No more data; stop fetching
         console.log(`Page ${page} returned 0 results; stopping.`);
         break;
       }
 
       allResults = allResults.concat(pageResults);
-      actualTotalPages = page;
-
-      // Update progress after each page
-      await supabaseClient
-        .from("fetch_progress")
-        .update({
-          total_pages: actualTotalPages,
-          current_page: page,
-          message: `Processing page ${page}...`,
-        })
-        .eq("session_id", progressSessionId);
-
-      // Check if there's another page
+      apiPagesFetched = page;
       currentHasNext = pageData.page_metadata?.hasNext ?? false;
+
+      await updateProgress(supabaseClient, progressSessionId, {
+        total_pages: apiPagesFetched,
+        current_page: apiPagesFetched,
+        message: JSON.stringify({
+          phase: "api_fetch",
+          phaseLabel: `Fetched page ${page} (${allResults.length} total results)${currentHasNext ? ', fetching more...' : ''}`,
+          apiPagesTotal: currentHasNext ? apiPagesFetched + '+' : apiPagesFetched,
+          apiPagesFetched,
+          apiResultsTotal: allResults.length,
+          recordsPrepared: 0,
+          recordsInserted: 0,
+          recordsTotal: 0,
+          errors: [],
+          startedAt,
+        }),
+      });
+
       page++;
     }
 
-    // Final total pages update
-    await supabaseClient
-      .from("fetch_progress")
-      .update({ total_pages: actualTotalPages })
-      .eq("session_id", progressSessionId);
+    console.log(`Total results fetched: ${allResults.length} across ${apiPagesFetched} pages`);
 
-    console.log(`Total results fetched: ${allResults.length}`);
-    
-    // Update progress: starting to process records
-    await supabaseClient
-      .from("fetch_progress")
-      .update({
-        message: `Fetched ${allResults.length} results, processing records...`,
-      })
-      .eq("session_id", progressSessionId);
+    // --- PROCESSING PHASE ---
+    await updateProgress(supabaseClient, progressSessionId, {
+      total_pages: apiPagesFetched,
+      current_page: apiPagesFetched,
+      message: JSON.stringify({
+        phase: "processing",
+        phaseLabel: `Processing ${allResults.length} API results...`,
+        apiPagesTotal: apiPagesFetched,
+        apiPagesFetched,
+        apiResultsTotal: allResults.length,
+        recordsPrepared: 0,
+        recordsInserted: 0,
+        recordsTotal: 0,
+        errors: [],
+        startedAt,
+      }),
+    });
 
     // Get existing verticals
     const { data: existingVerticals } = await supabaseClient
@@ -561,7 +648,6 @@ async function processData(
       (existingVerticals || []).map((v: any) => [v.name.toLowerCase(), v.id])
     );
 
-    // Get existing grant types for CFDA matching
     const { data: grantTypes } = await supabaseClient
       .from("grant_types")
       .select("id, cfda_code, name");
@@ -576,7 +662,6 @@ async function processData(
     let recordsAdded = 0;
     const errors: string[] = [];
 
-    // Get existing funding records to prevent duplicates
     const existingRecords = new Set<string>();
     const { data: existingFundingRecords } = await supabaseClient
       .from("funding_records")
@@ -587,19 +672,28 @@ async function processData(
       existingRecords.add(`${record.organization_id}-${record.amount}-${record.fiscal_year}-${record.action_date || ''}`);
     });
 
-    // --- PHASE 1: Collect unique org names from results ---
+    // --- PHASE 1: Resolve organizations ---
     const uniqueOrgNames = new Set<string>();
     for (const result of allResults) {
       const name = result["Recipient Name"];
       if (name) uniqueOrgNames.add(name);
     }
 
-    await supabaseClient
-      .from("fetch_progress")
-      .update({ message: `Resolving ${uniqueOrgNames.size} organizations...` })
-      .eq("session_id", progressSessionId);
+    await updateProgress(supabaseClient, progressSessionId, {
+      message: JSON.stringify({
+        phase: "processing",
+        phaseLabel: `Resolving ${uniqueOrgNames.size} organizations...`,
+        apiPagesTotal: apiPagesFetched,
+        apiPagesFetched,
+        apiResultsTotal: allResults.length,
+        recordsPrepared: 0,
+        recordsInserted: 0,
+        recordsTotal: 0,
+        errors,
+        startedAt,
+      }),
+    });
 
-    // Fetch all existing orgs for this state in one query
     const { data: existingOrgs } = await supabaseClient
       .from("organizations")
       .select("id, name")
@@ -608,10 +702,8 @@ async function processData(
     const orgNameToId = new Map<string, string>();
     (existingOrgs || []).forEach((org: any) => orgNameToId.set(org.name, org.id));
 
-    // Batch-insert new organizations
     const newOrgNames = Array.from(uniqueOrgNames).filter(n => !orgNameToId.has(n));
     if (newOrgNames.length > 0) {
-      // Insert in batches of 200
       for (let i = 0; i < newOrgNames.length; i += 200) {
         const batch = newOrgNames.slice(i, i + 200).map(name => ({
           name,
@@ -632,7 +724,7 @@ async function processData(
 
     console.log(`Resolved ${orgNameToId.size} organizations (${newOrgNames.length} new)`);
 
-    // --- PHASE 2: Prepare all funding records in memory ---
+    // --- PHASE 2: Prepare funding records ---
     const fundingBatch: any[] = [];
 
     for (const result of allResults) {
@@ -642,15 +734,12 @@ async function processData(
         const awardingAgency = result["Awarding Agency"] || "Unknown";
         const startDateStr = normalizeDateToYmd(result["Start Date"]);
         const endDateStr = normalizeDateToYmd(result["End Date"]);
-        // "Action Date" is the date the specific action/transaction was signed
-        // Fallback chain: Action Date → Start Date → End Date → search start date
         const actionDateStr = normalizeDateToYmd(result["Action Date"])
           || startDateStr
           || endDateStr
           || (startDate ? normalizeDateToYmd(startDate) : null)
           || `${fiscalYear}-01-01`;
         const cfdaNumber = result["CFDA Number"];
-        // "Assistance Listings" is the documented field for CFDA program info
         const assistanceListings = result["Assistance Listings"];
         const cfdaTitle = assistanceListings?.title || assistanceListings?.program_title || "";
 
@@ -658,7 +747,6 @@ async function processData(
         if (cfdaNumber) grantTypeId = grantTypeMap.get(cfdaNumber) || null;
         if (!grantTypeId && cfdaTitle) grantTypeId = grantTypeNameMap.get(cfdaTitle.toLowerCase()) || null;
 
-        // Determine vertical
         const description = result["Description"] || "";
         const subAgency = result["Awarding Sub Agency"] || "";
         const combinedText = `${cfdaTitle} ${description} ${awardingAgency} ${subAgency} ${recipientName}`.toLowerCase();
@@ -730,11 +818,21 @@ async function processData(
       }
     }
 
-    // --- PHASE 3: Batch insert funding records ---
-    await supabaseClient
-      .from("fetch_progress")
-      .update({ message: `Inserting ${fundingBatch.length} funding records...` })
-      .eq("session_id", progressSessionId);
+    // --- PHASE 3: Insert funding records ---
+    await updateProgress(supabaseClient, progressSessionId, {
+      message: JSON.stringify({
+        phase: "inserting",
+        phaseLabel: `Inserting ${fundingBatch.length} records into database...`,
+        apiPagesTotal: apiPagesFetched,
+        apiPagesFetched,
+        apiResultsTotal: allResults.length,
+        recordsPrepared: fundingBatch.length,
+        recordsInserted: 0,
+        recordsTotal: fundingBatch.length,
+        errors,
+        startedAt,
+      }),
+    });
 
     const BATCH_SIZE = 200;
     for (let i = 0; i < fundingBatch.length; i += BATCH_SIZE) {
@@ -751,28 +849,44 @@ async function processData(
         recordsAdded += (batchData || []).length;
       }
 
-      await supabaseClient
-        .from("fetch_progress")
-        .update({
-          records_inserted: recordsAdded,
-          message: `Inserted ${recordsAdded} of ${fundingBatch.length} prime awards...`,
-        })
-        .eq("session_id", progressSessionId);
+      await updateProgress(supabaseClient, progressSessionId, {
+        records_inserted: recordsAdded,
+        message: JSON.stringify({
+          phase: "inserting",
+          phaseLabel: `Inserted ${recordsAdded} of ${fundingBatch.length} records...`,
+          apiPagesTotal: apiPagesFetched,
+          apiPagesFetched,
+          apiResultsTotal: allResults.length,
+          recordsPrepared: fundingBatch.length,
+          recordsInserted: recordsAdded,
+          recordsTotal: fundingBatch.length,
+          errors,
+          startedAt,
+        }),
+      });
     }
 
     console.log(`Successfully added ${recordsAdded} prime awards`);
 
     if (!skipClear) {
-      // Update final progress (single-state mode)
-      await supabaseClient
-        .from("fetch_progress")
-        .update({
-          status: "completed",
-          records_inserted: recordsAdded,
+      await updateProgress(supabaseClient, progressSessionId, {
+        status: "completed",
+        records_inserted: recordsAdded,
+        errors,
+        message: JSON.stringify({
+          phase: "completed",
+          phaseLabel: `Completed! Inserted ${recordsAdded} prime awards.`,
+          apiPagesTotal: apiPagesFetched,
+          apiPagesFetched,
+          apiResultsTotal: allResults.length,
+          recordsPrepared: fundingBatch.length,
+          recordsInserted: recordsAdded,
+          recordsTotal: fundingBatch.length,
           errors,
-          message: `Completed! Inserted ${recordsAdded} prime awards. Fetch subawards separately.`,
-        })
-        .eq("session_id", progressSessionId);
+          startedAt,
+          completedAt: new Date().toISOString(),
+        }),
+      });
     }
 
     return recordsAdded;
@@ -780,13 +894,16 @@ async function processData(
   } catch (error) {
     console.error("Error in background processing:", error);
 
-    // Update progress with error status
     try {
       await supabaseClient
         .from("fetch_progress")
         .update({
           status: "failed",
-          message: error instanceof Error ? error.message : "Unknown error",
+          message: JSON.stringify({
+            phase: "failed",
+            phaseLabel: error instanceof Error ? error.message : "Unknown error",
+            errors: [error instanceof Error ? error.message : "Unknown error"],
+          }),
           errors: [error instanceof Error ? error.message : "Unknown error"],
         })
         .eq("session_id", progressSessionId);
