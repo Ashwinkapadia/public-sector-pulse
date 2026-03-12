@@ -135,8 +135,18 @@ export function MoneyTrailDiscovery() {
               <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-44" />
             </div>
             <div>
+              <label className="text-sm font-medium mb-1 block">ALN Number <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <Input
+                type="text"
+                placeholder="e.g. 93.798"
+                value={alnInput}
+                onChange={(e) => setAlnInput(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <div>
               <label className="text-sm font-medium mb-1 block">Vertical</label>
-              <Select value={selectedVertical} onValueChange={setSelectedVertical}>
+              <Select value={selectedVertical} onValueChange={setSelectedVertical} disabled={!!alnInput.trim()}>
                 <SelectTrigger className="w-52">
                   <SelectValue placeholder="All Verticals" />
                 </SelectTrigger>
@@ -150,10 +160,15 @@ export function MoneyTrailDiscovery() {
             </div>
             <Button onClick={handleDiscover} disabled={loading} className="gap-2">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              {loading ? "Searching..." : "Hunt for Grants"}
+              {loading ? "Searching..." : alnInput.trim() ? "Follow the Money" : "Hunt for Grants"}
             </Button>
           </div>
-          {selectedVertical !== "all" && (
+          {alnInput.trim() && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              💡 ALN provided — will skip Grants.gov and go directly to Prime & Sub-Award tracking.
+            </p>
+          )}
+          {!alnInput.trim() && selectedVertical !== "all" && (
             <div className="mt-3 flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Filtering ALN prefixes:</span>
               {getAlnPrefixesForVerticals([selectedVertical]).map((p) => (
