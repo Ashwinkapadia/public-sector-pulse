@@ -40,6 +40,7 @@ export function MoneyTrailDiscovery() {
   );
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [selectedVertical, setSelectedVertical] = useState<string>("all");
+  const [alnInput, setAlnInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<DiscoveredGrant[]>([]);
   const [trackingAln, setTrackingAln] = useState<string | null>(null);
@@ -51,6 +52,30 @@ export function MoneyTrailDiscovery() {
     setLoading(true);
     setResults([]);
     setTrail(null);
+
+    const trimmedAln = alnInput.trim();
+
+    // If ALN is provided, skip Grants.gov and go straight to money trail
+    if (trimmedAln) {
+      try {
+        setTrackingAln(trimmedAln);
+        const [prime, sub] = await Promise.all([
+          PulseDiscoveryService.trackPrimeAwards(trimmedAln, startDate, endDate),
+          PulseDiscoveryService.trackSubAwards(trimmedAln, startDate, endDate),
+        ]);
+        setTrail({ aln: trimmedAln, prime, sub });
+        if (prime.results.length === 0 && sub.results.length === 0) {
+          toast({ title: "No Results", description: `No prime or sub-awards found for ALN ${trimmedAln}.` });
+        }
+      } catch (err: any) {
+        toast({ variant: "destructive", title: "Tracking Failed", description: err.message });
+      } finally {
+        setTrackingAln(null);
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       const prefixes =
         selectedVertical !== "all"
