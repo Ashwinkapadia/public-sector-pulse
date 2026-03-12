@@ -154,50 +154,63 @@ Deno.serve(async (req) => {
         });
       }
 
-      const payload: any = {
-        filters: {
-          award_type_codes: ["02", "03", "04", "05"],
-          program_numbers: [aln],
-        },
-        fields: [
-          "Award ID",
-          "Recipient Name",
-          "Award Amount",
-          "Awarding Agency",
-          "Awarding Sub Agency",
-          "Start Date",
-          "End Date",
-          "recipient_id",
-          "Description",
-        ],
-        page: 1,
-        limit: 10,
-        subawards: false,
-        order: "desc",
-        sort: "Award Amount",
-      };
+      const PAGE_SIZE = 100;
+      const MAX_PAGES = 10;
+      let allResults: any[] = [];
+      let totalCount = 0;
+      let page = 1;
 
-      if (startDate && endDate) {
-        payload.filters.time_period = [{ start_date: startDate, end_date: endDate }];
-      }
+      while (page <= MAX_PAGES) {
+        const payload: any = {
+          filters: {
+            award_type_codes: ["02", "03", "04", "05"],
+            program_numbers: [aln],
+          },
+          fields: [
+            "Award ID", "Recipient Name", "Award Amount",
+            "Awarding Agency", "Awarding Sub Agency",
+            "Start Date", "End Date", "Description",
+          ],
+          page,
+          limit: PAGE_SIZE,
+          subawards: false,
+          order: "desc",
+          sort: "Award Amount",
+        };
 
-      const response = await fetch("https://api.usaspending.gov/api/v2/search/spending_by_award/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+        if (startDate && endDate) {
+          payload.filters.time_period = [{ start_date: startDate, end_date: endDate }];
+        }
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("USAspending prime error:", errText);
-        return new Response(JSON.stringify({ error: `USAspending API error: ${response.status}` }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        const response = await fetch("https://api.usaspending.gov/api/v2/search/spending_by_award/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error("USAspending prime error:", errText);
+          if (allResults.length === 0) {
+            return new Response(JSON.stringify({ error: `USAspending API error: ${response.status}` }), {
+              status: 502,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          break;
+        }
+
+        const data = await response.json();
+        totalCount = data.page_metadata?.total || 0;
+        const hits = data.results || [];
+        allResults = allResults.concat(hits);
+        console.log(`Prime awards page ${page}: fetched ${allResults.length}/${totalCount}`);
+
+        if (!data.page_metadata?.hasNext || hits.length < PAGE_SIZE) break;
+        page++;
       }
 
-      const data = await response.json();
-      const results = (data.results || []).map((r: any) => ({
+      const results = allResults.map((r: any) => ({
         awardId: r["Award ID"],
         recipientName: r["Recipient Name"],
         amount: r["Award Amount"],
@@ -208,7 +221,7 @@ Deno.serve(async (req) => {
         description: r["Description"],
       }));
 
-      return new Response(JSON.stringify({ results, totalCount: data.page_metadata?.total || results.length }), {
+      return new Response(JSON.stringify({ results, totalCount: totalCount || results.length }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
