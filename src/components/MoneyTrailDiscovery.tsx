@@ -320,7 +320,7 @@ export function MoneyTrailDiscovery() {
                 <p className="text-sm text-muted-foreground">No sub-awards found for this ALN.</p>
               ) : (
                 <div className="space-y-3">
-                  {trail.sub.results.slice(0, 5).map((sub, i) => (
+                  {trail.sub.results.map((sub, i) => (
                     <div key={i} className="border rounded-md p-3 space-y-1">
                       <p className="font-medium text-sm">{sub.subAwardeeName}</p>
                       <p className="text-xs text-muted-foreground">
@@ -335,16 +335,6 @@ export function MoneyTrailDiscovery() {
                       )}
                     </div>
                   ))}
-                  {trail.sub.totalCount > 5 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => navigate(`/sub-awards?aln_list=${trail.aln}`)}
-                    >
-                      View all {trail.sub.totalCount} sub-awards <ArrowRight className="h-3 w-3" />
-                    </Button>
-                  )}
                 </div>
               )}
             </CardContent>
