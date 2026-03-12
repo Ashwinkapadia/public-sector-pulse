@@ -285,7 +285,7 @@ export function MoneyTrailDiscovery() {
                 <p className="text-sm text-muted-foreground">No prime awards found for this ALN.</p>
               ) : (
                 <div className="space-y-3">
-                  {trail.prime.results.slice(0, 5).map((award, i) => (
+                  {trail.prime.results.map((award, i) => (
                     <div key={i} className="border rounded-md p-3 space-y-1">
                       <p className="font-medium text-sm">{award.recipientName}</p>
                       <p className="text-xs text-muted-foreground">
@@ -299,16 +299,6 @@ export function MoneyTrailDiscovery() {
                       </p>
                     </div>
                   ))}
-                  {trail.prime.totalCount > 5 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => navigate(`/?source=USAspending`)}
-                    >
-                      View all {trail.prime.totalCount} prime awards <ArrowRight className="h-3 w-3" />
-                    </Button>
-                  )}
                 </div>
               )}
             </CardContent>
