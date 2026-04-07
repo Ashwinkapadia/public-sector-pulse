@@ -657,6 +657,7 @@ const Index = () => {
           <TabsList className="mb-6">
             <TabsTrigger value="dashboard">Prime Awards Dashboard</TabsTrigger>
             <TabsTrigger value="money-trail">💰 Money Trail Discovery</TabsTrigger>
+            <TabsTrigger value="grant-monitor">🔍 Grant Monitor</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard">
