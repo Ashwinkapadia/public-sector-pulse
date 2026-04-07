@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
           aln: firstAln,
           title: opp.title || "Untitled",
           agency: opp.agencyCode || opp.agency || "Unknown",
-          openDate: opp.openDate || "",
+          postedDate: opp.openDate || "",
           closeDate: opp.closeDate || "",
           status: opp.oppStatus || "",
           link: opp.id ? `https://www.grants.gov/search-results-detail/${opp.id}` : "",
