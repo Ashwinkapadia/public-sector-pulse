@@ -21,6 +21,7 @@ import { VerticalsFilter } from "@/components/VerticalsFilter";
 import { FetchProgress } from "@/components/FetchProgress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyTrailDiscovery } from "@/components/MoneyTrailDiscovery";
+import { GrantMonitor } from "@/components/GrantMonitor";
 import { format } from "date-fns";
 
 const Index = () => {
