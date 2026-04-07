@@ -721,8 +721,13 @@ export function GrantMonitor() {
                       <TableCell>
                         {run.csv_url ? (
                           <a href={run.csv_url} target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4 text-primary" />
+                            <Button variant="outline" size="sm" className="gap-1">
+                              <Download className="h-3 w-3" />
+                              CSV
+                            </Button>
                           </a>
+                        ) : run.status === "running" ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                         ) : run.error_message ? (
                           <span className="text-xs text-destructive" title={run.error_message}>
                             Error
