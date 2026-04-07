@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
 
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { action, scheduleId, alns, lookbackMonths } = await req.json();
+    const { action, scheduleId, alns, lookbackMonths, startDate: reqStartDate, endDate: reqEndDate } = await req.json();
 
     if (action === "run_pipeline") {
       // Determine ALNs and email from schedule or manual params
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
       }
 
       // Return immediately, run pipeline in background
-      const promise = runPipeline(serviceClient, run.id, targetAlns, lookback, emailAddress || "");
+      const promise = runPipeline(serviceClient, run.id, targetAlns, lookback, emailAddress || "", reqStartDate, reqEndDate);
       // @ts-ignore - EdgeRuntime.waitUntil is available in Supabase Edge Functions
       if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
         EdgeRuntime.waitUntil(promise);
@@ -295,15 +295,26 @@ async function runPipeline(
   runId: string,
   alns: string[],
   lookbackMonths: number,
-  emailAddress: string
+  emailAddress: string,
+  explicitStartDate?: string,
+  explicitEndDate?: string
 ) {
   try {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - lookbackMonths);
+    let startStr: string;
+    let endStr: string;
 
-    const startStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
-    const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
+    if (explicitStartDate && explicitEndDate) {
+      // Use the exact date range from the user's search filters
+      startStr = explicitStartDate;
+      endStr = explicitEndDate;
+    } else {
+      // Fallback to lookback months
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - lookbackMonths);
+      startStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
+      endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
+    }
 
     let totalPrime = 0;
     let totalSub = 0;
