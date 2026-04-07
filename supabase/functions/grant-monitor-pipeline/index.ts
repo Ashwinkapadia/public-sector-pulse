@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
             .single();
 
           if (run) {
-            await runPipeline(serviceClient, run.id, alns, schedule.lookback_months || 3, schedule.email_address);
+            await runPipeline(serviceClient, run.id, alns, schedule.lookback_months || 3, schedule.email_address, undefined, undefined);
           }
 
           // Update schedule
