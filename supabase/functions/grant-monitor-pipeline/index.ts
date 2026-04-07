@@ -333,6 +333,36 @@ async function runPipeline(
       }
     }
 
+    const csvContent = csvRows.join("\n");
+
+    // Upload CSV to storage
+    let csvUrl: string | null = null;
+    try {
+      const fileName = `pipeline_${runId}_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+      const csvBlob = new Blob([csvContent], { type: "text/csv" });
+      const arrayBuffer = await csvBlob.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+
+      const { error: uploadErr } = await serviceClient.storage
+        .from("grant-monitor-csvs")
+        .upload(fileName, uint8, { contentType: "text/csv", upsert: false });
+
+      if (!uploadErr) {
+        const { data: urlData } = serviceClient.storage
+          .from("grant-monitor-csvs")
+          .getPublicUrl(fileName);
+        // Since bucket is private, generate a signed URL instead
+        const { data: signedData } = await serviceClient.storage
+          .from("grant-monitor-csvs")
+          .createSignedUrl(fileName, 60 * 60 * 24 * 30); // 30 days
+        csvUrl = signedData?.signedUrl || null;
+      } else {
+        console.error("CSV upload error:", uploadErr);
+      }
+    } catch (storageErr: any) {
+      console.error("Storage error:", storageErr.message);
+    }
+
     // Update run with results
     await serviceClient
       .from("grant_monitor_runs")
@@ -341,12 +371,12 @@ async function runPipeline(
         prime_awards_found: totalPrime,
         sub_awards_found: totalSub,
         completed_at: new Date().toISOString(),
+        csv_url: csvUrl,
       })
       .eq("id", runId);
 
     // Send email if address provided
     if (emailAddress) {
-      const csvContent = csvRows.join("\n");
       await sendEmailWithCSV(emailAddress, alns, totalPrime, totalSub, csvContent);
     }
   } catch (err: any) {

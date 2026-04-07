@@ -465,6 +465,27 @@ export function GrantMonitor() {
                 {selectedAlns.size} ALN(s) selected
               </div>
               <Button
+                onClick={() => {
+                  const csvHeader = "ALN/CFDA,Title,Agency,Posted Date,Close Date,Link";
+                  const csvRows = results.map((g) =>
+                    `"${g.aln}","${(g.title || '').replace(/"/g, '""')}","${(g.agency || '').replace(/"/g, '""')}","${g.postedDate || ''}","${g.closeDate || ''}","${g.link || ''}"`
+                  );
+                  const csvContent = [csvHeader, ...csvRows].join("\n");
+                  const blob = new Blob([csvContent], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `grants_gov_results_${format(new Date(), "yyyy-MM-dd")}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                variant="outline"
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download All Results as CSV
+              </Button>
+              <Button
                 onClick={exportToPrimeAwards}
                 disabled={selectedAlns.size === 0}
                 className="gap-2"
@@ -488,7 +509,7 @@ export function GrantMonitor() {
                 className="gap-2"
               >
                 <Play className="h-4 w-4" />
-                Run Full Pipeline (Prime + Sub + Email CSV)
+                Run Full Pipeline (Prime + Sub + CSV)
               </Button>
             </div>
           </CardContent>
@@ -700,8 +721,13 @@ export function GrantMonitor() {
                       <TableCell>
                         {run.csv_url ? (
                           <a href={run.csv_url} target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4 text-primary" />
+                            <Button variant="outline" size="sm" className="gap-1">
+                              <Download className="h-3 w-3" />
+                              CSV
+                            </Button>
                           </a>
+                        ) : run.status === "running" ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                         ) : run.error_message ? (
                           <span className="text-xs text-destructive" title={run.error_message}>
                             Error
