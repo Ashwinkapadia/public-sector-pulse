@@ -900,6 +900,10 @@ const Index = () => {
           <TabsContent value="money-trail">
             <MoneyTrailDiscovery />
           </TabsContent>
+
+          <TabsContent value="grant-monitor">
+            <GrantMonitor />
+          </TabsContent>
         </Tabs>
       </main>
 
