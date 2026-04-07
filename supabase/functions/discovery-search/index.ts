@@ -90,12 +90,15 @@ Deno.serve(async (req) => {
 
         const data = await response.json();
         const hits = data.data?.oppHits || [];
-        totalCount = data.data?.totalCount || 0;
+        totalCount = Number(data.data?.hitCount ?? data.data?.totalCount ?? 0);
         allOpportunities = allOpportunities.concat(hits);
 
-        console.log(`Fetched ${allOpportunities.length} / ${totalCount}`);
+        console.log(`Fetched ${allOpportunities.length} / ${totalCount || "unknown"}`);
 
-        if (allOpportunities.length >= totalCount || hits.length < PAGE_SIZE) {
+        if (hits.length < PAGE_SIZE) {
+          break;
+        }
+        if (totalCount > 0 && allOpportunities.length >= totalCount) {
           break;
         }
         page++;
