@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
       }
 
       const PAGE_SIZE = 100;
-      const MAX_PAGES = 10;
+      const MAX_PAGES = 100;
       let allResults: any[] = [];
       let totalCount = 0;
       let page = 1;
@@ -236,7 +236,7 @@ Deno.serve(async (req) => {
       }
 
       const PAGE_SIZE = 100;
-      const MAX_PAGES = 10;
+      const MAX_PAGES = 100;
       let allResults: any[] = [];
       let totalCount = 0;
       let page = 1;

@@ -415,7 +415,7 @@ async function fetchUSASpendingAwards(
   type: "prime" | "sub"
 ): Promise<any[]> {
   const PAGE_SIZE = 100;
-  const MAX_PAGES = 10;
+  const MAX_PAGES = 100;
 
   const filters = {
     time_period: [{ start_date: startDate, end_date: endDate }],
