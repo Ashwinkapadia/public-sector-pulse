@@ -165,6 +165,107 @@ export type Database = {
           },
         ]
       }
+      grant_monitor_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          csv_url: string | null
+          error_message: string | null
+          grants_found: number | null
+          id: string
+          prime_awards_found: number | null
+          schedule_id: string | null
+          started_at: string
+          status: string
+          sub_awards_found: number | null
+          unique_alns: string[] | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          csv_url?: string | null
+          error_message?: string | null
+          grants_found?: number | null
+          id?: string
+          prime_awards_found?: number | null
+          schedule_id?: string | null
+          started_at?: string
+          status?: string
+          sub_awards_found?: number | null
+          unique_alns?: string[] | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          csv_url?: string | null
+          error_message?: string | null
+          grants_found?: number | null
+          id?: string
+          prime_awards_found?: number | null
+          schedule_id?: string | null
+          started_at?: string
+          status?: string
+          sub_awards_found?: number | null
+          unique_alns?: string[] | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grant_monitor_runs_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "grant_monitor_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grant_monitor_schedules: {
+        Row: {
+          created_at: string
+          email_address: string
+          frequency: string
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          lookback_months: number
+          name: string
+          next_run_at: string | null
+          updated_at: string
+          user_id: string
+          vertical_ids: string[] | null
+        }
+        Insert: {
+          created_at?: string
+          email_address: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          lookback_months?: number
+          name: string
+          next_run_at?: string | null
+          updated_at?: string
+          user_id: string
+          vertical_ids?: string[] | null
+        }
+        Update: {
+          created_at?: string
+          email_address?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          lookback_months?: number
+          name?: string
+          next_run_at?: string | null
+          updated_at?: string
+          user_id?: string
+          vertical_ids?: string[] | null
+        }
+        Relationships: []
+      }
       grant_types: {
         Row: {
           cfda_code: string | null

@@ -21,6 +21,7 @@ import { VerticalsFilter } from "@/components/VerticalsFilter";
 import { FetchProgress } from "@/components/FetchProgress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyTrailDiscovery } from "@/components/MoneyTrailDiscovery";
+import { GrantMonitor } from "@/components/GrantMonitor";
 import { format } from "date-fns";
 
 const Index = () => {
@@ -656,6 +657,7 @@ const Index = () => {
           <TabsList className="mb-6">
             <TabsTrigger value="dashboard">Prime Awards Dashboard</TabsTrigger>
             <TabsTrigger value="money-trail">💰 Money Trail Discovery</TabsTrigger>
+            <TabsTrigger value="grant-monitor">🔍 Grant Monitor</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard">
@@ -897,6 +899,10 @@ const Index = () => {
 
           <TabsContent value="money-trail">
             <MoneyTrailDiscovery />
+          </TabsContent>
+
+          <TabsContent value="grant-monitor">
+            <GrantMonitor />
           </TabsContent>
         </Tabs>
       </main>
