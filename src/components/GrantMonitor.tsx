@@ -295,9 +295,10 @@ export function GrantMonitor() {
       const body: any = { action: "run_pipeline" };
       if (scheduleId) body.scheduleId = scheduleId;
       else {
-        // Manual run with current selections
+        // Manual run with current selections - use same date range as the search
         body.alns = Array.from(selectedAlns);
-        body.lookbackMonths = 3;
+        body.startDate = startDate;
+        body.endDate = endDate;
       }
 
       const { data, error } = await supabase.functions.invoke("grant-monitor-pipeline", {
