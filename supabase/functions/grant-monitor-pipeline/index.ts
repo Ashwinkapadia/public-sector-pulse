@@ -434,32 +434,29 @@ async function fetchUSASpendingAwards(
   let page = 1;
 
   while (page <= MAX_PAGES) {
-    const endpoint =
-      type === "prime"
-        ? "https://api.usaspending.gov/api/v2/search/spending_by_award/"
-        : "https://api.usaspending.gov/api/v2/subawards/";
+    // Both prime and sub use the same endpoint; subawards flag differentiates
+    const endpoint = "https://api.usaspending.gov/api/v2/search/spending_by_award/";
 
-    const payload: any =
-      type === "prime"
-        ? {
-            filters,
-            fields: [
-              "Award ID", "Recipient Name", "Award Amount",
-              "Awarding Agency", "Awarding Sub Agency",
-              "Start Date", "End Date", "Description",
-            ],
-            page,
-            limit: PAGE_SIZE,
-            sort: "Award Amount",
-            order: "desc",
-          }
-        : {
-            filters,
-            page,
-            limit: PAGE_SIZE,
-            sort: "amount",
-            order: "desc",
-          };
+    const primeFields = [
+      "Award ID", "Recipient Name", "Award Amount",
+      "Awarding Agency", "Awarding Sub Agency",
+      "Start Date", "End Date", "Description",
+    ];
+    const subFields = [
+      "Sub-Award ID", "Sub-Awardee Name", "Sub-Award Amount",
+      "Awarding Agency", "Action Date", "Sub-Award Description",
+      "Prime Recipient Name",
+    ];
+
+    const payload: any = {
+      filters,
+      fields: type === "prime" ? primeFields : subFields,
+      page,
+      limit: PAGE_SIZE,
+      sort: type === "prime" ? "Award Amount" : "Sub-Award Amount",
+      order: "desc",
+      subawards: type === "sub",
+    };
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -470,7 +467,7 @@ async function fetchUSASpendingAwards(
     if (!response.ok) break;
 
     const data = await response.json();
-    const hits = type === "prime" ? data?.results || [] : data?.results || [];
+    const hits = data?.results || [];
     if (hits.length === 0) break;
 
     for (const hit of hits) {
@@ -485,15 +482,17 @@ async function fetchUSASpendingAwards(
         });
       } else {
         allResults.push({
-          recipientName: hit.recipient_name || hit.sub_awardee_or_recipient_legal || "",
-          amount: hit.amount || hit.sub_award_amount || 0,
-          date: hit.action_date || hit.sub_action_date || "",
-          description: hit.description || "",
+          recipientName: hit["Sub-Awardee Name"] || "",
+          amount: hit["Sub-Award Amount"] || 0,
+          date: hit["Action Date"] || "",
+          description: hit["Sub-Award Description"] || "",
+          agency: hit["Awarding Agency"] || "",
+          primeRecipient: hit["Prime Recipient Name"] || "",
         });
       }
     }
 
-    if (type === "prime" && !data?.page_metadata?.hasNext) break;
+    if (!data?.page_metadata?.hasNext) break;
     if (hits.length < PAGE_SIZE) break;
     page++;
   }
