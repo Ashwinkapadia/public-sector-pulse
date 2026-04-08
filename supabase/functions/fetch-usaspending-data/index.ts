@@ -39,6 +39,13 @@ interface RequestBody {
   alnNumber?: string;
 }
 
+function parseAlnList(alnNumber?: string): string[] {
+  return alnNumber
+    ?.split(",")
+    .map((code) => code.trim())
+    .filter((code) => code.length > 0) ?? [];
+}
+
 // Helper to update progress with a consistent shape
 async function updateProgress(
   supabaseClient: any,
@@ -512,6 +519,8 @@ async function processData(
       ? new Date(startDate).getFullYear()
       : currentYear;
 
+    const requestedAlnList = parseAlnList(alnNumber);
+
     const filters: any = {
       time_period: [
         {
@@ -520,7 +529,10 @@ async function processData(
         },
       ],
       award_type_codes: ["02", "03", "04", "05"],
-      recipient_type_names: [
+    };
+
+    if (requestedAlnList.length === 0) {
+      filters.recipient_type_names = [
         "Authorities and Commissions",
         "Local Government",
         "Regional and State Government",
@@ -531,8 +543,8 @@ async function processData(
         "U.S. Territory or Possession",
         "Council of Governments",
         "National Government",
-      ],
-    };
+      ];
+    }
 
     // Only add state filter if state is provided
     if (state) {
@@ -544,12 +556,9 @@ async function processData(
       ];
     }
 
-    if (alnNumber?.trim()) {
-      const alnList = alnNumber.split(",").map(c => c.trim()).filter(c => c.length > 0);
-      if (alnList.length > 0) {
-        filters.program_numbers = alnList;
-        console.log("Filtering by ALN:", alnList);
-      }
+    if (requestedAlnList.length > 0) {
+      filters.program_numbers = requestedAlnList;
+      console.log("Filtering by ALN:", requestedAlnList);
     }
 
     await updateProgress(supabaseClient, progressSessionId, {
@@ -843,9 +852,26 @@ async function processData(
           || endDateStr
           || (startDate ? normalizeDateToYmd(startDate) : null)
           || `${fiscalYear}-01-01`;
-        const cfdaNumber = result["CFDA Number"];
-        const assistanceListings = result["Assistance Listings"];
-        const cfdaTitle = assistanceListings?.title || assistanceListings?.program_title || "";
+        const assistanceListingsRaw = result["Assistance Listings"];
+        const assistanceListings = Array.isArray(assistanceListingsRaw)
+          ? assistanceListingsRaw
+          : assistanceListingsRaw ? [assistanceListingsRaw] : [];
+        const matchedListing = requestedAlnList.length > 0
+          ? assistanceListings.find((listing: any) => {
+              const listingCode = String(listing?.cfda_number || "").trim();
+              return listingCode.length > 0 && requestedAlnList.includes(listingCode);
+            })
+          : null;
+        const primaryListing = matchedListing || assistanceListings[0] || null;
+        const cfdaNumber = matchedListing?.cfda_number
+          || result["CFDA Number"]
+          || primaryListing?.cfda_number
+          || null;
+        const cfdaTitle = matchedListing?.cfda_program_title
+          || primaryListing?.cfda_program_title
+          || primaryListing?.title
+          || primaryListing?.program_title
+          || "";
 
         let grantTypeId = null;
         if (cfdaNumber) grantTypeId = grantTypeMap.get(cfdaNumber) || null;

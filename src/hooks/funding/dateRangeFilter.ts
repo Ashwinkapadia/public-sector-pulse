@@ -25,8 +25,10 @@ export function buildAwardDateOrFilter(params: {
   // Both bounds
   if (startStr && endStr) {
     return [
-      `and(action_date.gte.${startStr},action_date.lte.${endStr})`,
-      `and(action_date.is.null,date_range_start.gte.${startStr},date_range_start.lte.${endStr})`,
+      `and(action_date.not.is.null,action_date.gte.${startStr},action_date.lte.${endStr})`,
+      `and(action_date.is.null,date_range_start.not.is.null,date_range_end.not.is.null,date_range_start.lte.${endStr},date_range_end.gte.${startStr})`,
+      `and(action_date.is.null,date_range_start.not.is.null,date_range_end.is.null,date_range_start.lte.${endStr})`,
+      `and(action_date.is.null,date_range_start.is.null,date_range_end.not.is.null,date_range_end.gte.${startStr})`,
     ].join(",");
   }
 
@@ -34,13 +36,15 @@ export function buildAwardDateOrFilter(params: {
   if (startStr) {
     return [
       `action_date.gte.${startStr}`,
-      `and(action_date.is.null,date_range_start.gte.${startStr})`,
+      `and(action_date.is.null,date_range_end.not.is.null,date_range_end.gte.${startStr})`,
+      `and(action_date.is.null,date_range_end.is.null,date_range_start.not.is.null,date_range_start.gte.${startStr})`,
     ].join(",");
   }
 
   // End only
   return [
     `action_date.lte.${endStr}`,
-    `and(action_date.is.null,date_range_start.lte.${endStr})`,
+    `and(action_date.is.null,date_range_start.not.is.null,date_range_start.lte.${endStr})`,
+    `and(action_date.is.null,date_range_start.is.null,date_range_end.not.is.null,date_range_end.lte.${endStr})`,
   ].join(",");
 }
