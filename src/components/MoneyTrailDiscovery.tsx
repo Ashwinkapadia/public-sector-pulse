@@ -40,7 +40,11 @@ export function MoneyTrailDiscovery() {
   );
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [selectedVertical, setSelectedVertical] = useState<string>("all");
-  const [alnInput, setAlnInput] = useState("");
+  const [alnInput, setAlnInput] = useState(() => {
+    const saved = localStorage.getItem("moneytrail_aln");
+    if (saved) localStorage.removeItem("moneytrail_aln");
+    return saved || "";
+  });
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<DiscoveredGrant[]>([]);
   const [trackingAln, setTrackingAln] = useState<string | null>(null);
