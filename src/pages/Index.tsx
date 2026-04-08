@@ -62,6 +62,7 @@ const Index = () => {
   const [fetchingGrants, setFetchingGrants] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [fetchSessionId, setFetchSessionId] = useState<string | null>(null);
   const [subawardsFetchSessionId, setSubawardsFetchSessionId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -653,7 +654,7 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
-        <Tabs defaultValue="dashboard" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="dashboard">Prime Awards Dashboard</TabsTrigger>
             <TabsTrigger value="money-trail">💰 Money Trail Discovery</TabsTrigger>
@@ -902,7 +903,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="grant-monitor">
-            <GrantMonitor />
+            <GrantMonitor onSwitchTab={setActiveTab} />
           </TabsContent>
         </Tabs>
       </main>
