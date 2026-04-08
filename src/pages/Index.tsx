@@ -421,54 +421,7 @@ const Index = () => {
   };
 
   const handleFetchUSASpendingData = async () => {
-    if (isAdmin === false) {
-      toast({
-        variant: "destructive",
-        title: "Admin access required",
-        description: "Your account does not have permission to run data imports.",
-      });
-      return;
-    }
-
-    if (!selectedState && !alnFilter.trim()) {
-      toast({
-        variant: "destructive",
-        title: "State or ALN Required",
-        description: "Please select a state or enter ALN numbers before fetching data",
-      });
-      return;
-    }
-
-    setFetching(true);
-    const sessionId = crypto.randomUUID();
-    setFetchSessionId(sessionId);
-    
-    try {
-      const { data, error } = await invokeWithAuth("fetch-usaspending-data", {
-        state: selectedState || undefined,
-        startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
-        endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
-        alnNumber: alnFilter.trim() || undefined,
-        sessionId,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success!",
-        description: `Fetched ${data?.recordsAdded || 0} funding records from USAspending.gov`,
-      });
-    } catch (error: any) {
-      console.error("Error fetching data:", error);
-      toast({
-        variant: "destructive",
-        title: "Failed to fetch data",
-        description: formatInvokeError(error),
-      });
-      setFetchSessionId(null);
-    } finally {
-      setFetching(false);
-    }
+    await startPrimeAwardsFetch();
   };
 
   const handleFetchComplete = useCallback(async () => {
