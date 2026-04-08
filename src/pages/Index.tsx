@@ -221,42 +221,135 @@ const Index = () => {
     return () => window.clearTimeout(t);
   }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals, debouncedAlnFilter]);
 
+  const startPrimeAwardsFetch = useCallback(async (
+    alnValue?: string,
+    options?: { silent?: boolean }
+  ) => {
+    const effectiveAln = (alnValue ?? alnFilter).trim();
+    const silent = options?.silent ?? false;
+
+    if (fetching) return false;
+
+    if (isAdmin === false) {
+      if (!silent) {
+        toast({
+          variant: "destructive",
+          title: "Admin access required",
+          description: "Your account does not have permission to run data imports.",
+        });
+      }
+      return false;
+    }
+
+    if (!selectedState && !effectiveAln) {
+      if (!silent) {
+        toast({
+          variant: "destructive",
+          title: "State or ALN Required",
+          description: "Please select a state or enter ALN numbers before fetching data",
+        });
+      }
+      return false;
+    }
+
+    setFetching(true);
+    const sessionId = crypto.randomUUID();
+    setFetchSessionId(sessionId);
+
+    try {
+      const { error } = await invokeWithAuth("fetch-usaspending-data", {
+        state: selectedState || undefined,
+        startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+        endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
+        alnNumber: effectiveAln || undefined,
+        sessionId,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: silent ? "ALN Search Started" : "Prime Awards Fetch Started",
+        description: effectiveAln
+          ? `Fetching prime awards for ALN ${effectiveAln}...`
+          : "Fetching prime awards in the background...",
+      });
+
+      return true;
+    } catch (error: any) {
+      console.error("Error fetching data:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to fetch data",
+        description: formatInvokeError(error),
+      });
+      setFetchSessionId(null);
+      setFetching(false);
+      return false;
+    }
+  }, [alnFilter, endDate, fetching, isAdmin, selectedState, startDate, toast]);
+
   // Auto-fetch when ALNs are exported from Grant Monitor
   useEffect(() => {
     if (pendingAutoFetch && !loading && !fetching && isAdmin !== null && debouncedAlnFilter) {
       setPendingAutoFetch(false);
-      // Trigger fetch with ALN filter (state is optional)
-      const doAutoFetch = async () => {
-        setFetching(true);
-        const sessionId = crypto.randomUUID();
-        setFetchSessionId(sessionId);
-        try {
-          const { data, error } = await invokeWithAuth("fetch-usaspending-data", {
-            state: selectedState || undefined,
-            startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
-            endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
-            alnNumber: debouncedAlnFilter,
-            sessionId,
-          });
-          if (error) throw error;
-          toast({
-            title: "Auto-Fetch Started",
-            description: `Fetching prime awards for exported ALNs...`,
-          });
-        } catch (error: any) {
-          console.error("Auto-fetch error:", error);
-          toast({
-            variant: "destructive",
-            title: "Auto-fetch failed",
-            description: formatInvokeError(error),
-          });
-          setFetchSessionId(null);
-          setFetching(false);
-        }
-      };
-      doAutoFetch();
+      void startPrimeAwardsFetch(debouncedAlnFilter, { silent: true });
     }
-  }, [pendingAutoFetch, loading, fetching, isAdmin, debouncedAlnFilter]);
+  }, [pendingAutoFetch, loading, fetching, isAdmin, debouncedAlnFilter, startPrimeAwardsFetch]);
+
+  // Auto-fetch on manual ALN search only when current filtered results are empty.
+  useEffect(() => {
+    const normalizedAln = debouncedAlnFilter.trim();
+
+    if (!normalizedAln) {
+      attemptedAutoFetchKeyRef.current = "";
+      return;
+    }
+
+    if (
+      activeTab !== "dashboard" ||
+      pendingAutoFetch ||
+      loading ||
+      fetching ||
+      isAdmin !== true ||
+      isDashboardFundingLoading
+    ) {
+      return;
+    }
+
+    if ((dashboardFundingRecords?.length ?? 0) > 0) {
+      attemptedAutoFetchKeyRef.current = "";
+      return;
+    }
+
+    const searchKey = [
+      selectedState || "ALL",
+      startDate ? format(startDate, "yyyy-MM-dd") : "",
+      endDate ? format(endDate, "yyyy-MM-dd") : "",
+      [...selectedVerticals].sort().join(","),
+      normalizedAln,
+    ].join("|");
+
+    if (attemptedAutoFetchKeyRef.current === searchKey) {
+      return;
+    }
+
+    attemptedAutoFetchKeyRef.current = searchKey;
+    void startPrimeAwardsFetch(normalizedAln, { silent: true });
+  }, [
+    activeTab,
+    dashboardFundingRecords,
+    debouncedAlnFilter,
+    endDate,
+    fetching,
+    isAdmin,
+    isDashboardFundingLoading,
+    loading,
+    pendingAutoFetch,
+    selectedState,
+    selectedVerticals,
+    startDate,
+    startPrimeAwardsFetch,
+  ]);
 
   // Persist filters to localStorage so they survive page refresh
   useEffect(() => {
