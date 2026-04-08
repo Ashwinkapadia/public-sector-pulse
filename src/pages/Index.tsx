@@ -289,68 +289,7 @@ const Index = () => {
     }
   }, [alnFilter, endDate, fetching, isAdmin, selectedState, startDate, toast]);
 
-  // Auto-fetch when ALNs are exported from Grant Monitor
-  useEffect(() => {
-    if (pendingAutoFetch && !loading && !fetching && isAdmin !== null && debouncedAlnFilter) {
-      setPendingAutoFetch(false);
-      void startPrimeAwardsFetch(debouncedAlnFilter, { silent: true });
-    }
-  }, [pendingAutoFetch, loading, fetching, isAdmin, debouncedAlnFilter, startPrimeAwardsFetch]);
-
-  // Auto-fetch on manual ALN search only when current filtered results are empty.
-  useEffect(() => {
-    const normalizedAln = debouncedAlnFilter.trim();
-
-    if (!normalizedAln) {
-      attemptedAutoFetchKeyRef.current = "";
-      return;
-    }
-
-    if (
-      activeTab !== "dashboard" ||
-      pendingAutoFetch ||
-      loading ||
-      fetching ||
-      isAdmin !== true ||
-      isDashboardFundingLoading
-    ) {
-      return;
-    }
-
-    if ((dashboardFundingRecords?.length ?? 0) > 0) {
-      attemptedAutoFetchKeyRef.current = "";
-      return;
-    }
-
-    const searchKey = [
-      selectedState || "ALL",
-      startDate ? format(startDate, "yyyy-MM-dd") : "",
-      endDate ? format(endDate, "yyyy-MM-dd") : "",
-      [...selectedVerticals].sort().join(","),
-      normalizedAln,
-    ].join("|");
-
-    if (attemptedAutoFetchKeyRef.current === searchKey) {
-      return;
-    }
-
-    attemptedAutoFetchKeyRef.current = searchKey;
-    void startPrimeAwardsFetch(normalizedAln, { silent: true });
-  }, [
-    activeTab,
-    dashboardFundingRecords,
-    debouncedAlnFilter,
-    endDate,
-    fetching,
-    isAdmin,
-    isDashboardFundingLoading,
-    loading,
-    pendingAutoFetch,
-    selectedState,
-    selectedVerticals,
-    startDate,
-    startPrimeAwardsFetch,
-  ]);
+  // Auto-fetch removed: user must manually click "Fetch" to trigger data imports.
 
   // Persist filters to localStorage so they survive page refresh
   useEffect(() => {
