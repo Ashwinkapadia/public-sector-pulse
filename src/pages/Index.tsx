@@ -46,7 +46,15 @@ const Index = () => {
   // Debounce ALN filter to avoid firing queries on every keystroke
   const [debouncedAlnFilter, setDebouncedAlnFilter] = useState<string>(alnFilter);
   const alnDebounceRef = useRef<number>();
+  // Track whether to skip debounce (e.g. programmatic import from Grant Monitor)
+  const skipAlnDebounceRef = useRef(false);
   useEffect(() => {
+    if (skipAlnDebounceRef.current) {
+      skipAlnDebounceRef.current = false;
+      console.log("[ALN Debounce] Skipping debounce, setting immediately:", alnFilter);
+      setDebouncedAlnFilter(alnFilter);
+      return;
+    }
     if (alnDebounceRef.current) window.clearTimeout(alnDebounceRef.current);
     alnDebounceRef.current = window.setTimeout(() => {
       console.log("[ALN Debounce] Setting debounced value:", alnFilter);
@@ -157,6 +165,10 @@ const Index = () => {
 
   // Re-read localStorage when switching to dashboard (e.g. from Grant Monitor export)
   const [pendingAutoFetch, setPendingAutoFetch] = useState(false);
+  // Use a ref to read the latest alnFilter without adding it to deps (which would cause re-runs)
+  const alnFilterRef = useRef(alnFilter);
+  useEffect(() => { alnFilterRef.current = alnFilter; }, [alnFilter]);
+
   useEffect(() => {
     if (activeTab === "dashboard") {
       const savedAln = localStorage.getItem("dashboard_aln") || "";
@@ -164,15 +176,20 @@ const Index = () => {
       const savedEnd = localStorage.getItem("dashboard_endDate");
       const autoFetch = localStorage.getItem("dashboard_autoFetch");
       
-      let changed = false;
-      if (savedAln !== alnFilter) { setAlnFilter(savedAln); changed = true; }
+      console.log("[Tab Switch] Reading localStorage for dashboard:", { savedAln, autoFetch, currentAln: alnFilterRef.current });
+      
+      if (savedAln && savedAln !== alnFilterRef.current) {
+        // Skip debounce so queries fire immediately with the imported ALN
+        skipAlnDebounceRef.current = true;
+        setAlnFilter(savedAln);
+      }
       if (savedStart) {
         const d = new Date(savedStart);
-        if (!startDate || d.getTime() !== startDate.getTime()) { setStartDate(d); changed = true; }
+        if (!startDate || d.getTime() !== startDate.getTime()) { setStartDate(d); }
       }
       if (savedEnd) {
         const d = new Date(savedEnd);
-        if (!endDate || d.getTime() !== endDate.getTime()) { setEndDate(d); changed = true; }
+        if (!endDate || d.getTime() !== endDate.getTime()) { setEndDate(d); }
       }
       
       // Auto-trigger fetch if flagged by Grant Monitor export
