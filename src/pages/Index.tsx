@@ -46,7 +46,15 @@ const Index = () => {
   // Debounce ALN filter to avoid firing queries on every keystroke
   const [debouncedAlnFilter, setDebouncedAlnFilter] = useState<string>(alnFilter);
   const alnDebounceRef = useRef<number>();
+  // Track whether to skip debounce (e.g. programmatic import from Grant Monitor)
+  const skipAlnDebounceRef = useRef(false);
   useEffect(() => {
+    if (skipAlnDebounceRef.current) {
+      skipAlnDebounceRef.current = false;
+      console.log("[ALN Debounce] Skipping debounce, setting immediately:", alnFilter);
+      setDebouncedAlnFilter(alnFilter);
+      return;
+    }
     if (alnDebounceRef.current) window.clearTimeout(alnDebounceRef.current);
     alnDebounceRef.current = window.setTimeout(() => {
       console.log("[ALN Debounce] Setting debounced value:", alnFilter);
