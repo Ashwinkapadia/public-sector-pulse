@@ -105,9 +105,12 @@ Deno.serve(async (req) => {
     }
 
     const { state, startDate, endDate, sessionId, alnNumber } = await req.json() as RequestBody;
+    const normalizedAln = alnNumber?.trim() || undefined;
+    const normalizedState = state?.trim() || undefined;
+    const useNationwideAlnSearch = (!normalizedState || normalizedState === "ALL") && Boolean(normalizedAln);
 
     // State is required unless ALN numbers are provided (nationwide ALN search)
-    if (!state && !alnNumber?.trim()) {
+    if (!normalizedState && !normalizedAln) {
       return new Response(
         JSON.stringify({ error: "State or ALN number is required" }),
         {
@@ -128,7 +131,7 @@ Deno.serve(async (req) => {
       .from("fetch_progress")
       .upsert({
         session_id: progressSessionId,
-        state: state || "NATIONWIDE",
+        state: useNationwideAlnSearch ? "NATIONWIDE" : (normalizedState || "NATIONWIDE"),
         source: "USAspending.gov",
         status: "running",
         message: JSON.stringify({
@@ -153,10 +156,10 @@ Deno.serve(async (req) => {
       console.error("Error creating progress:", progressError);
     }
 
-    if (!state || state === "ALL") {
-      EdgeRuntime.waitUntil(processAllStatesOrNationwide(supabaseClient, state, startDate, endDate, progressSessionId, alnNumber));
+    if (!normalizedState || normalizedState === "ALL") {
+      EdgeRuntime.waitUntil(processAllStatesOrNationwide(supabaseClient, normalizedState, startDate, endDate, progressSessionId, normalizedAln));
     } else {
-      EdgeRuntime.waitUntil(processData(supabaseClient, state, startDate, endDate, progressSessionId, false, alnNumber));
+      EdgeRuntime.waitUntil(processData(supabaseClient, normalizedState, startDate, endDate, progressSessionId, false, normalizedAln));
     }
 
     return new Response(
@@ -236,8 +239,10 @@ async function processAllStatesOrNationwide(
   progressSessionId: string,
   alnNumber?: string,
 ) {
-  // If no state specified (ALN-only nationwide search), do a single nationwide fetch
-  if (!state) {
+  const useNationwideAlnSearch = (!state || state === "ALL") && Boolean(alnNumber?.trim());
+
+  // ALN-only nationwide search should use a single API call with no state filter.
+  if (useNationwideAlnSearch) {
     const startedAt = new Date().toISOString();
     try {
       await updateProgress(supabaseClient, progressSessionId, {
