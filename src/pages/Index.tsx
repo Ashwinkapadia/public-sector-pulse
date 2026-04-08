@@ -326,7 +326,7 @@ const Index = () => {
     
     try {
       const { data, error } = await invokeWithAuth("fetch-usaspending-data", {
-        state: selectedState,
+        state: selectedState || undefined,
         startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
         endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
         alnNumber: alnFilter.trim() || undefined,
