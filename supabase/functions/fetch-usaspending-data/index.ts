@@ -106,9 +106,10 @@ Deno.serve(async (req) => {
 
     const { state, startDate, endDate, sessionId, alnNumber } = await req.json() as RequestBody;
 
-    if (!state) {
+    // State is required unless ALN numbers are provided (nationwide ALN search)
+    if (!state && !alnNumber?.trim()) {
       return new Response(
-        JSON.stringify({ error: "State is required" }),
+        JSON.stringify({ error: "State or ALN number is required" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -152,8 +153,8 @@ Deno.serve(async (req) => {
       console.error("Error creating progress:", progressError);
     }
 
-    if (state === "ALL") {
-      EdgeRuntime.waitUntil(processAllStates(supabaseClient, startDate, endDate, progressSessionId, alnNumber));
+    if (!state || state === "ALL") {
+      EdgeRuntime.waitUntil(processAllStatesOrNationwide(supabaseClient, state, startDate, endDate, progressSessionId, alnNumber));
     } else {
       EdgeRuntime.waitUntil(processData(supabaseClient, state, startDate, endDate, progressSessionId, false, alnNumber));
     }
