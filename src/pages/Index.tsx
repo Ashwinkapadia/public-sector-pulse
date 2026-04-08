@@ -23,7 +23,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyTrailDiscovery } from "@/components/MoneyTrailDiscovery";
 import { GrantMonitor } from "@/components/GrantMonitor";
 import { format } from "date-fns";
-import { useFundingRecords } from "@/hooks/useFundingData";
 
 const Index = () => {
   const [selectedState, setSelectedState] = useState<string | undefined>(() => {
@@ -44,25 +43,12 @@ const Index = () => {
   const [alnFilter, setAlnFilter] = useState<string>(() => {
     return localStorage.getItem("dashboard_aln") || "";
   });
-  // Debounce ALN filter to avoid firing queries on every keystroke
-  const [debouncedAlnFilter, setDebouncedAlnFilter] = useState<string>(alnFilter);
-  const alnDebounceRef = useRef<number>();
-  // Track whether to skip debounce (e.g. programmatic import from Grant Monitor)
-  const skipAlnDebounceRef = useRef(false);
-  useEffect(() => {
-    if (skipAlnDebounceRef.current) {
-      skipAlnDebounceRef.current = false;
-      console.log("[ALN Debounce] Skipping debounce, setting immediately:", alnFilter);
-      setDebouncedAlnFilter(alnFilter);
-      return;
-    }
-    if (alnDebounceRef.current) window.clearTimeout(alnDebounceRef.current);
-    alnDebounceRef.current = window.setTimeout(() => {
-      console.log("[ALN Debounce] Setting debounced value:", alnFilter);
-      setDebouncedAlnFilter(alnFilter);
-    }, 600);
-    return () => { if (alnDebounceRef.current) window.clearTimeout(alnDebounceRef.current); };
-  }, [alnFilter]);
+  const [appliedState, setAppliedState] = useState<string | undefined>();
+  const [appliedStartDate, setAppliedStartDate] = useState<Date | undefined>();
+  const [appliedEndDate, setAppliedEndDate] = useState<Date | undefined>();
+  const [appliedVerticals, setAppliedVerticals] = useState<string[]>([]);
+  const [appliedAlnFilter, setAppliedAlnFilter] = useState("");
+  const [hasAppliedSearch, setHasAppliedSearch] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -80,13 +66,6 @@ const Index = () => {
   const { data: savedSearches } = useSavedSearches();
   const saveSearchMutation = useSaveSearch();
   const deleteSearchMutation = useDeleteSearch();
-  const { data: dashboardFundingRecords, isLoading: isDashboardFundingLoading } = useFundingRecords(
-    selectedState,
-    startDate,
-    endDate,
-    selectedVerticals,
-    debouncedAlnFilter
-  );
 
 
   const getSessionWithTimeout = async (timeoutMs = 8000) => {
@@ -171,25 +150,14 @@ const Index = () => {
     };
   }, [navigate]);
 
-  // Re-read localStorage when switching to dashboard (e.g. from Grant Monitor export)
-  const [pendingAutoFetch, setPendingAutoFetch] = useState(false);
-  // Use a ref to read the latest alnFilter without adding it to deps (which would cause re-runs)
-  const alnFilterRef = useRef(alnFilter);
-  const attemptedAutoFetchKeyRef = useRef("");
-  useEffect(() => { alnFilterRef.current = alnFilter; }, [alnFilter]);
-
   useEffect(() => {
     if (activeTab === "dashboard") {
       const savedAln = localStorage.getItem("dashboard_aln") || "";
       const savedStart = localStorage.getItem("dashboard_startDate");
       const savedEnd = localStorage.getItem("dashboard_endDate");
-      const autoFetch = localStorage.getItem("dashboard_autoFetch");
-      
-      console.log("[Tab Switch] Reading localStorage for dashboard:", { savedAln, autoFetch, currentAln: alnFilterRef.current });
-      
-      if (savedAln && savedAln !== alnFilterRef.current) {
-        // Skip debounce so queries fire immediately with the imported ALN
-        skipAlnDebounceRef.current = true;
+      localStorage.removeItem("dashboard_autoFetch");
+
+      if (savedAln !== alnFilter) {
         setAlnFilter(savedAln);
       }
       if (savedStart) {
@@ -200,26 +168,10 @@ const Index = () => {
         const d = new Date(savedEnd);
         if (!endDate || d.getTime() !== endDate.getTime()) { setEndDate(d); }
       }
-      
-      // Auto-trigger fetch if flagged by Grant Monitor export
-      if (autoFetch === "true" && savedAln) {
-        localStorage.removeItem("dashboard_autoFetch");
-        setPendingAutoFetch(true);
-      }
+
+      setHasAppliedSearch(false);
     }
-  }, [activeTab]);
-
-  // Invalidate cache when filters change so hooks refetch with new parameters.
-  useEffect(() => {
-    if (loading) return;
-
-    const t = window.setTimeout(() => {
-      queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false });
-    }, 200);
-
-    return () => window.clearTimeout(t);
-  }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals, debouncedAlnFilter]);
+  }, [activeTab, alnFilter, endDate, startDate]);
 
   const startPrimeAwardsFetch = useCallback(async (
     alnValue?: string,
@@ -289,7 +241,21 @@ const Index = () => {
     }
   }, [alnFilter, endDate, fetching, isAdmin, selectedState, startDate, toast]);
 
-  // Auto-fetch removed: user must manually click "Fetch" to trigger data imports.
+  const handleApplyDashboardSearch = async () => {
+    setAppliedState(selectedState);
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+    setAppliedVerticals(selectedVerticals);
+    setAppliedAlnFilter(alnFilter.trim());
+    setHasAppliedSearch(true);
+    localStorage.setItem("dashboard_hasAppliedSearch", "true");
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["funding_records"], exact: false }),
+      queryClient.invalidateQueries({ queryKey: ["funding_metrics"], exact: false }),
+      queryClient.invalidateQueries({ queryKey: ["subawards-by-state"], exact: false }),
+    ]);
+  };
 
   // Persist filters to localStorage so they survive page refresh
   useEffect(() => {
@@ -564,11 +530,19 @@ const Index = () => {
     setEndDate(undefined);
     setSelectedVerticals([]);
     setAlnFilter("");
+    setAppliedState(undefined);
+    setAppliedStartDate(undefined);
+    setAppliedEndDate(undefined);
+    setAppliedVerticals([]);
+    setAppliedAlnFilter("");
+    setHasAppliedSearch(false);
     localStorage.removeItem("dashboard_state");
     localStorage.removeItem("dashboard_startDate");
     localStorage.removeItem("dashboard_endDate");
     localStorage.removeItem("dashboard_verticals");
     localStorage.removeItem("dashboard_aln");
+    localStorage.removeItem("dashboard_hasAppliedSearch");
+    localStorage.removeItem("dashboard_autoFetch");
     toast({
       title: "Filters cleared",
       description: "All filters have been reset",
@@ -596,11 +570,19 @@ const Index = () => {
       setEndDate(undefined);
       setSelectedVerticals([]);
       setAlnFilter("");
+      setAppliedState(undefined);
+      setAppliedStartDate(undefined);
+      setAppliedEndDate(undefined);
+      setAppliedVerticals([]);
+      setAppliedAlnFilter("");
+      setHasAppliedSearch(false);
       setFetchSessionId(null);
       localStorage.removeItem("dashboard_aln");
       localStorage.removeItem("dashboard_startDate");
       localStorage.removeItem("dashboard_endDate");
       localStorage.removeItem("dashboard_verticals");
+      localStorage.removeItem("dashboard_hasAppliedSearch");
+      localStorage.removeItem("dashboard_autoFetch");
 
       // HARD-RESET: Remove all cached funding/metrics/org data so stale rows cannot appear.
       queryClient.removeQueries({ queryKey: ["organizations"], exact: false });
@@ -667,9 +649,11 @@ const Index = () => {
       setSelectedState(search.state || undefined);
       setStartDate(search.start_date ? new Date(search.start_date) : undefined);
       setEndDate(search.end_date ? new Date(search.end_date) : undefined);
+      setHasAppliedSearch(false);
+      localStorage.removeItem("dashboard_hasAppliedSearch");
       toast({
         title: "Search loaded",
-        description: `Loaded search: ${search.name}`,
+        description: `Loaded search: ${search.name}. Click Search Dashboard to apply it.`,
       });
     }
   };
@@ -861,12 +845,18 @@ const Index = () => {
                   />
                 </div>
 
-                {/* Debug: show what the UI thinks the filters are */}
-                <div className="mt-4 text-xs text-muted-foreground">
-                  Active filters: state={selectedState || "(none)"} • ALN={alnFilter || "(none)"} • start=
-                  {startDate ? format(startDate, "yyyy-MM-dd") : "(none)"} • end=
-                  {endDate ? format(endDate, "yyyy-MM-dd") : "(none)"} • verticals=
-                  {selectedVerticals.length}
+                <div className="mt-4 space-y-1 text-xs text-muted-foreground">
+                  <div>
+                    Draft filters: state={selectedState || "(none)"} • ALN={alnFilter || "(none)"} • start=
+                    {startDate ? format(startDate, "yyyy-MM-dd") : "(none)"} • end=
+                    {endDate ? format(endDate, "yyyy-MM-dd") : "(none)"} • verticals=
+                    {selectedVerticals.length}
+                  </div>
+                  <div>
+                    {hasAppliedSearch
+                      ? `Applied search: state=${appliedState || "(none)"} • ALN=${appliedAlnFilter || "(none)"} • start=${appliedStartDate ? format(appliedStartDate, "yyyy-MM-dd") : "(none)"} • end=${appliedEndDate ? format(appliedEndDate, "yyyy-MM-dd") : "(none)"} • verticals=${appliedVerticals.length}`
+                      : "Results update only after you click Search Dashboard."}
+                  </div>
                 </div>
 
                 <div className="mt-6">
@@ -874,6 +864,15 @@ const Index = () => {
                     selectedVerticals={selectedVerticals}
                     onSelectVerticals={setSelectedVerticals}
                   />
+                </div>
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <Button onClick={handleApplyDashboardSearch} className="gap-2" size="lg">
+                    <Search className="h-4 w-4" />
+                    Search Dashboard
+                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    You can set all filters first. Results only refresh when you click Search Dashboard.
+                  </p>
                 </div>
                 {/* Prime Awards Fetch Section */}
                 <div className="mt-6">
@@ -947,27 +946,37 @@ const Index = () => {
               </section>
             )}
 
-            {/* Metrics Overview */}
-            <section className="mb-8">
-              <FundingMetrics state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} alnFilter={debouncedAlnFilter} />
-            </section>
+            {hasAppliedSearch ? (
+              <>
+                {/* Metrics Overview */}
+                <section className="mb-8">
+                  <FundingMetrics state={appliedState} startDate={appliedStartDate} endDate={appliedEndDate} verticalIds={appliedVerticals} alnFilter={appliedAlnFilter} />
+                </section>
 
-            {/* Funding Chart */}
-            <section className="mb-8">
-              <FundingChart state={selectedState} startDate={startDate} endDate={endDate} verticalIds={selectedVerticals} alnFilter={debouncedAlnFilter} />
-            </section>
+                {/* Funding Chart */}
+                <section className="mb-8">
+                  <FundingChart state={appliedState} startDate={appliedStartDate} endDate={appliedEndDate} verticalIds={appliedVerticals} alnFilter={appliedAlnFilter} />
+                </section>
 
-            {/* Prime Awards Table */}
-            <section className="mb-8">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Prime Awards</h2>
-              <FundingTable state={selectedState} verticalIds={selectedVerticals} startDate={startDate} endDate={endDate} alnFilter={debouncedAlnFilter} />
-            </section>
+                {/* Prime Awards Table */}
+                <section className="mb-8">
+                  <h2 className="text-lg font-semibold text-foreground mb-4">Prime Awards</h2>
+                  <FundingTable state={appliedState} verticalIds={appliedVerticals} startDate={appliedStartDate} endDate={appliedEndDate} alnFilter={appliedAlnFilter} />
+                </section>
 
-            {/* Subawards Table */}
-            <section className="mb-8">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Subawards</h2>
-              <SubawardsTable state={selectedState} startDate={startDate} endDate={endDate} />
-            </section>
+                {/* Subawards Table */}
+                <section className="mb-8">
+                  <h2 className="text-lg font-semibold text-foreground mb-4">Subawards</h2>
+                  <SubawardsTable state={appliedState} startDate={appliedStartDate} endDate={appliedEndDate} />
+                </section>
+              </>
+            ) : (
+              <section className="mb-8">
+                <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
+                  Set your filters, then click <span className="font-medium text-foreground">Search Dashboard</span> to load results.
+                </div>
+              </section>
+            )}
 
             {/* Data Sources */}
             <section>
