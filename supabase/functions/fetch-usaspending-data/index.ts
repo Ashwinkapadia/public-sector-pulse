@@ -760,20 +760,53 @@ async function processData(
       }),
     });
 
-    const { data: existingOrgs } = await supabaseClient
-      .from("organizations")
-      .select("id, name")
-      .eq("state", state);
-
+    // For nationwide (no state) searches, we need to extract state from each result's Recipient Location
+    // For state-specific searches, query existing orgs by state
     const orgNameToId = new Map<string, string>();
-    (existingOrgs || []).forEach((org: any) => orgNameToId.set(org.name, org.id));
+
+    if (state) {
+      const { data: existingOrgs } = await supabaseClient
+        .from("organizations")
+        .select("id, name")
+        .eq("state", state);
+      (existingOrgs || []).forEach((org: any) => orgNameToId.set(org.name, org.id));
+    } else {
+      // For nationwide, check all existing orgs by name
+      const nameList = Array.from(uniqueOrgNames);
+      for (let i = 0; i < nameList.length; i += 200) {
+        const batch = nameList.slice(i, i + 200);
+        const { data: existingOrgs } = await supabaseClient
+          .from("organizations")
+          .select("id, name")
+          .in("name", batch);
+        (existingOrgs || []).forEach((org: any) => orgNameToId.set(org.name, org.id));
+      }
+    }
+
+    // Build a map of org name -> state from API results (for creating new orgs)
+    const orgStateMap = new Map<string, string>();
+    for (const result of allResults) {
+      const name = result["Recipient Name"];
+      if (!name || orgNameToId.has(name)) continue;
+      const loc = result["Recipient Location"];
+      let orgState = state || "US";
+      if (loc && typeof loc === "object") {
+        orgState = loc.state_code || loc.state_name || state || "US";
+      } else if (typeof loc === "string") {
+        // Try to extract state code from location string like "City, ST"
+        const parts = loc.split(",").map((s: string) => s.trim());
+        const lastPart = parts[parts.length - 1];
+        if (lastPart && lastPart.length === 2) orgState = lastPart;
+      }
+      orgStateMap.set(name, orgState);
+    }
 
     const newOrgNames = Array.from(uniqueOrgNames).filter(n => !orgNameToId.has(n));
     if (newOrgNames.length > 0) {
       for (let i = 0; i < newOrgNames.length; i += 200) {
         const batch = newOrgNames.slice(i, i + 200).map(name => ({
           name,
-          state,
+          state: orgStateMap.get(name) || state || "US",
           last_updated: new Date().toISOString().split("T")[0],
         }));
         const { data: inserted, error: insertErr } = await supabaseClient
