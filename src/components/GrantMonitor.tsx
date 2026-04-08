@@ -59,7 +59,11 @@ interface MonitorRun {
   completed_at: string | null;
 }
 
-export function GrantMonitor() {
+interface GrantMonitorProps {
+  onSwitchTab?: (tab: string) => void;
+}
+
+export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
   // Search filters
   const [startDate, setStartDate] = useState(
     format(subDays(new Date(), 180), "yyyy-MM-dd")
@@ -193,14 +197,14 @@ export function GrantMonitor() {
     }
     const alnString = Array.from(selectedAlns).join(",");
     localStorage.setItem("dashboard_aln", alnString);
-    // Set 3 months lookback
     const threeMonthsAgo = subDays(new Date(), 90);
     localStorage.setItem("dashboard_startDate", threeMonthsAgo.toISOString());
     localStorage.setItem("dashboard_endDate", new Date().toISOString());
     toast({
       title: "ALNs Exported",
-      description: `${selectedAlns.size} ALN(s) sent to Prime Awards Dashboard. Switch to the Dashboard tab to see results.`,
+      description: `${selectedAlns.size} ALN(s) sent to Prime Awards Dashboard. Switching now...`,
     });
+    onSwitchTab?.("dashboard");
   };
 
   // Export to Money Trail Discovery (sets ALN in component - uses navigate)
@@ -209,13 +213,13 @@ export function GrantMonitor() {
       toast({ variant: "destructive", title: "No ALNs selected", description: "Select at least one ALN to export" });
       return;
     }
-    // Money Trail takes single ALN - use first selected
     const alnString = Array.from(selectedAlns).join(",");
     localStorage.setItem("moneytrail_aln", alnString);
     toast({
       title: "ALNs Exported",
-      description: `${selectedAlns.size} ALN(s) sent to Money Trail Discovery. Switch to the Money Trail tab to use them.`,
+      description: `${selectedAlns.size} ALN(s) sent to Money Trail Discovery. Switching now...`,
     });
+    onSwitchTab?.("money-trail");
   };
 
   // Create schedule
