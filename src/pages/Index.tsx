@@ -195,6 +195,43 @@ const Index = () => {
     return () => window.clearTimeout(t);
   }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals, debouncedAlnFilter]);
 
+  // Auto-fetch when ALNs are exported from Grant Monitor
+  useEffect(() => {
+    if (pendingAutoFetch && !loading && !fetching && isAdmin !== null && debouncedAlnFilter) {
+      setPendingAutoFetch(false);
+      // Trigger fetch with ALN filter (state is optional)
+      const doAutoFetch = async () => {
+        setFetching(true);
+        const sessionId = crypto.randomUUID();
+        setFetchSessionId(sessionId);
+        try {
+          const { data, error } = await invokeWithAuth("fetch-usaspending-data", {
+            state: selectedState || undefined,
+            startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+            endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
+            alnNumber: debouncedAlnFilter,
+            sessionId,
+          });
+          if (error) throw error;
+          toast({
+            title: "Auto-Fetch Started",
+            description: `Fetching prime awards for exported ALNs...`,
+          });
+        } catch (error: any) {
+          console.error("Auto-fetch error:", error);
+          toast({
+            variant: "destructive",
+            title: "Auto-fetch failed",
+            description: formatInvokeError(error),
+          });
+          setFetchSessionId(null);
+          setFetching(false);
+        }
+      };
+      doAutoFetch();
+    }
+  }, [pendingAutoFetch, loading, fetching, isAdmin, debouncedAlnFilter]);
+
   // Persist filters to localStorage so they survive page refresh
   useEffect(() => {
     if (selectedState) localStorage.setItem("dashboard_state", selectedState);
