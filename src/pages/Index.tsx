@@ -869,7 +869,7 @@ const Index = () => {
                   <div className="flex gap-3 flex-wrap">
                     <Button
                       onClick={handleFetchUSASpendingData}
-                      disabled={fetching || !selectedState}
+                      disabled={fetching || (!selectedState && !alnFilter.trim())}
                       className="gap-2"
                       size="lg"
                     >
