@@ -410,7 +410,7 @@ async function processAllStates(
 // Background processing function
 async function processData(
   supabaseClient: any,
-  state: string,
+  state: string | undefined,
   startDate: string | undefined,
   endDate: string | undefined,
   progressSessionId: string,
@@ -434,7 +434,7 @@ async function processData(
   } catch {}
 
   try {
-    console.log(`Fetching data for state: ${state}`);
+    console.log(`Fetching data for state: ${state || "NATIONWIDE"}`);
 
     // --- CLEAR PHASE ---
     if (!skipClear) {
