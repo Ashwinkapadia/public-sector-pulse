@@ -508,12 +508,6 @@ async function processData(
       : currentYear;
 
     const filters: any = {
-      recipient_locations: [
-        {
-          country: "USA",
-          state: state,
-        },
-      ],
       time_period: [
         {
           start_date: startDate || `${fiscalYear}-01-01`,
@@ -534,6 +528,16 @@ async function processData(
         "National Government",
       ],
     };
+
+    // Only add state filter if state is provided
+    if (state) {
+      filters.recipient_locations = [
+        {
+          country: "USA",
+          state: state,
+        },
+      ];
+    }
 
     if (alnNumber?.trim()) {
       const alnList = alnNumber.split(",").map(c => c.trim()).filter(c => c.length > 0);
