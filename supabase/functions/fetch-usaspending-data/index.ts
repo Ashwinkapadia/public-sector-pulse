@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
       .from("fetch_progress")
       .upsert({
         session_id: progressSessionId,
-        state,
+        state: state || "NATIONWIDE",
         source: "USAspending.gov",
         status: "running",
         message: JSON.stringify({
