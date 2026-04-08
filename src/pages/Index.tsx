@@ -226,6 +226,7 @@ const Index = () => {
     options?: { silent?: boolean }
   ) => {
     const effectiveAln = (alnValue ?? alnFilter).trim();
+    const requestState = selectedState === "ALL" && effectiveAln ? undefined : selectedState || undefined;
     const silent = options?.silent ?? false;
 
     if (fetching) return false;
@@ -258,7 +259,7 @@ const Index = () => {
 
     try {
       const { error } = await invokeWithAuth("fetch-usaspending-data", {
-        state: selectedState || undefined,
+        state: requestState,
         startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
         endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
         alnNumber: effectiveAln || undefined,
