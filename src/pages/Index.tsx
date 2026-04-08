@@ -156,19 +156,29 @@ const Index = () => {
   }, [navigate]);
 
   // Re-read localStorage when switching to dashboard (e.g. from Grant Monitor export)
+  const [pendingAutoFetch, setPendingAutoFetch] = useState(false);
   useEffect(() => {
     if (activeTab === "dashboard") {
       const savedAln = localStorage.getItem("dashboard_aln") || "";
       const savedStart = localStorage.getItem("dashboard_startDate");
       const savedEnd = localStorage.getItem("dashboard_endDate");
-      if (savedAln !== alnFilter) setAlnFilter(savedAln);
+      const autoFetch = localStorage.getItem("dashboard_autoFetch");
+      
+      let changed = false;
+      if (savedAln !== alnFilter) { setAlnFilter(savedAln); changed = true; }
       if (savedStart) {
         const d = new Date(savedStart);
-        if (!startDate || d.getTime() !== startDate.getTime()) setStartDate(d);
+        if (!startDate || d.getTime() !== startDate.getTime()) { setStartDate(d); changed = true; }
       }
       if (savedEnd) {
         const d = new Date(savedEnd);
-        if (!endDate || d.getTime() !== endDate.getTime()) setEndDate(d);
+        if (!endDate || d.getTime() !== endDate.getTime()) { setEndDate(d); changed = true; }
+      }
+      
+      // Auto-trigger fetch if flagged by Grant Monitor export
+      if (autoFetch === "true" && savedAln) {
+        localStorage.removeItem("dashboard_autoFetch");
+        setPendingAutoFetch(true);
       }
     }
   }, [activeTab]);
