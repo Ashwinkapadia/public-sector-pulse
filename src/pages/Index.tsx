@@ -311,11 +311,11 @@ const Index = () => {
       return;
     }
 
-    if (!selectedState) {
+    if (!selectedState && !alnFilter.trim()) {
       toast({
         variant: "destructive",
-        title: "State Required",
-        description: "Please select a state before fetching data",
+        title: "State or ALN Required",
+        description: "Please select a state or enter ALN numbers before fetching data",
       });
       return;
     }
