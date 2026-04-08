@@ -200,10 +200,11 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
     const threeMonthsAgo = subDays(new Date(), 90);
     localStorage.setItem("dashboard_startDate", threeMonthsAgo.toISOString());
     localStorage.setItem("dashboard_endDate", new Date().toISOString());
-    localStorage.setItem("dashboard_autoFetch", "true");
+    localStorage.removeItem("dashboard_hasAppliedSearch");
+    localStorage.removeItem("dashboard_autoFetch");
     toast({
       title: "ALNs Exported",
-      description: `${selectedAlns.size} ALN(s) sent to Prime Awards Dashboard. Switching now...`,
+      description: `${selectedAlns.size} ALN(s) sent to Prime Awards Dashboard. Click Search Dashboard to run it.`,
     });
     onSwitchTab?.("dashboard");
   };
