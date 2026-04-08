@@ -228,6 +228,67 @@ async function clearAllUsaspendingData(supabaseClient: any) {
   console.log(`Cleared ${fundingIdsToClear.length} existing USAspending.gov records (ALL states)`);
 }
 
+async function processAllStatesOrNationwide(
+  supabaseClient: any,
+  state: string | undefined,
+  startDate: string | undefined,
+  endDate: string | undefined,
+  progressSessionId: string,
+  alnNumber?: string,
+) {
+  // If no state specified (ALN-only nationwide search), do a single nationwide fetch
+  if (!state) {
+    const startedAt = new Date().toISOString();
+    try {
+      await updateProgress(supabaseClient, progressSessionId, {
+        message: JSON.stringify({
+          phase: "api_fetch",
+          phaseLabel: "Fetching nationwide data by ALN...",
+          apiPagesTotal: 0,
+          apiPagesFetched: 0,
+          apiResultsTotal: 0,
+          recordsPrepared: 0,
+          recordsInserted: 0,
+          recordsTotal: 0,
+          errors: [],
+          startedAt,
+        }),
+      });
+
+      const recordsAdded = await processData(supabaseClient, undefined, startDate, endDate, progressSessionId, true, alnNumber);
+
+      await updateProgress(supabaseClient, progressSessionId, {
+        status: "completed",
+        records_inserted: recordsAdded,
+        message: JSON.stringify({
+          phase: "completed",
+          phaseLabel: `Completed! Inserted ${recordsAdded} prime awards nationwide.`,
+          recordsInserted: recordsAdded,
+          errors: [],
+          startedAt,
+          completedAt: new Date().toISOString(),
+        }),
+      });
+    } catch (error) {
+      console.error("Error in nationwide processing:", error);
+      await updateProgress(supabaseClient, progressSessionId, {
+        status: "failed",
+        errors: [error instanceof Error ? error.message : "Unknown error"],
+        message: JSON.stringify({
+          phase: "failed",
+          phaseLabel: error instanceof Error ? error.message : "Unknown error",
+          errors: [error instanceof Error ? error.message : "Unknown error"],
+          startedAt,
+        }),
+      });
+    }
+    return;
+  }
+
+  // Original ALL-states logic
+  return processAllStates(supabaseClient, startDate, endDate, progressSessionId, alnNumber);
+}
+
 async function processAllStates(
   supabaseClient: any,
   startDate: string | undefined,
