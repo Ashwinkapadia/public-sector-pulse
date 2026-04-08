@@ -200,6 +200,7 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
     const threeMonthsAgo = subDays(new Date(), 90);
     localStorage.setItem("dashboard_startDate", threeMonthsAgo.toISOString());
     localStorage.setItem("dashboard_endDate", new Date().toISOString());
+    localStorage.setItem("dashboard_autoFetch", "true");
     toast({
       title: "ALNs Exported",
       description: `${selectedAlns.size} ALN(s) sent to Prime Awards Dashboard. Switching now...`,

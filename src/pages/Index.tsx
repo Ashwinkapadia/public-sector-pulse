@@ -156,19 +156,29 @@ const Index = () => {
   }, [navigate]);
 
   // Re-read localStorage when switching to dashboard (e.g. from Grant Monitor export)
+  const [pendingAutoFetch, setPendingAutoFetch] = useState(false);
   useEffect(() => {
     if (activeTab === "dashboard") {
       const savedAln = localStorage.getItem("dashboard_aln") || "";
       const savedStart = localStorage.getItem("dashboard_startDate");
       const savedEnd = localStorage.getItem("dashboard_endDate");
-      if (savedAln !== alnFilter) setAlnFilter(savedAln);
+      const autoFetch = localStorage.getItem("dashboard_autoFetch");
+      
+      let changed = false;
+      if (savedAln !== alnFilter) { setAlnFilter(savedAln); changed = true; }
       if (savedStart) {
         const d = new Date(savedStart);
-        if (!startDate || d.getTime() !== startDate.getTime()) setStartDate(d);
+        if (!startDate || d.getTime() !== startDate.getTime()) { setStartDate(d); changed = true; }
       }
       if (savedEnd) {
         const d = new Date(savedEnd);
-        if (!endDate || d.getTime() !== endDate.getTime()) setEndDate(d);
+        if (!endDate || d.getTime() !== endDate.getTime()) { setEndDate(d); changed = true; }
+      }
+      
+      // Auto-trigger fetch if flagged by Grant Monitor export
+      if (autoFetch === "true" && savedAln) {
+        localStorage.removeItem("dashboard_autoFetch");
+        setPendingAutoFetch(true);
       }
     }
   }, [activeTab]);
@@ -184,6 +194,43 @@ const Index = () => {
 
     return () => window.clearTimeout(t);
   }, [queryClient, loading, selectedState, startDate, endDate, selectedVerticals, debouncedAlnFilter]);
+
+  // Auto-fetch when ALNs are exported from Grant Monitor
+  useEffect(() => {
+    if (pendingAutoFetch && !loading && !fetching && isAdmin !== null && debouncedAlnFilter) {
+      setPendingAutoFetch(false);
+      // Trigger fetch with ALN filter (state is optional)
+      const doAutoFetch = async () => {
+        setFetching(true);
+        const sessionId = crypto.randomUUID();
+        setFetchSessionId(sessionId);
+        try {
+          const { data, error } = await invokeWithAuth("fetch-usaspending-data", {
+            state: selectedState || undefined,
+            startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+            endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
+            alnNumber: debouncedAlnFilter,
+            sessionId,
+          });
+          if (error) throw error;
+          toast({
+            title: "Auto-Fetch Started",
+            description: `Fetching prime awards for exported ALNs...`,
+          });
+        } catch (error: any) {
+          console.error("Auto-fetch error:", error);
+          toast({
+            variant: "destructive",
+            title: "Auto-fetch failed",
+            description: formatInvokeError(error),
+          });
+          setFetchSessionId(null);
+          setFetching(false);
+        }
+      };
+      doAutoFetch();
+    }
+  }, [pendingAutoFetch, loading, fetching, isAdmin, debouncedAlnFilter]);
 
   // Persist filters to localStorage so they survive page refresh
   useEffect(() => {
@@ -264,11 +311,11 @@ const Index = () => {
       return;
     }
 
-    if (!selectedState) {
+    if (!selectedState && !alnFilter.trim()) {
       toast({
         variant: "destructive",
-        title: "State Required",
-        description: "Please select a state before fetching data",
+        title: "State or ALN Required",
+        description: "Please select a state or enter ALN numbers before fetching data",
       });
       return;
     }
@@ -279,7 +326,7 @@ const Index = () => {
     
     try {
       const { data, error } = await invokeWithAuth("fetch-usaspending-data", {
-        state: selectedState,
+        state: selectedState || undefined,
         startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
         endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
         alnNumber: alnFilter.trim() || undefined,
@@ -822,7 +869,7 @@ const Index = () => {
                   <div className="flex gap-3 flex-wrap">
                     <Button
                       onClick={handleFetchUSASpendingData}
-                      disabled={fetching || !selectedState}
+                      disabled={fetching || (!selectedState && !alnFilter.trim())}
                       className="gap-2"
                       size="lg"
                     >

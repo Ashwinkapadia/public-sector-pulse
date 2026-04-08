@@ -106,9 +106,10 @@ Deno.serve(async (req) => {
 
     const { state, startDate, endDate, sessionId, alnNumber } = await req.json() as RequestBody;
 
-    if (!state) {
+    // State is required unless ALN numbers are provided (nationwide ALN search)
+    if (!state && !alnNumber?.trim()) {
       return new Response(
-        JSON.stringify({ error: "State is required" }),
+        JSON.stringify({ error: "State or ALN number is required" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -127,7 +128,7 @@ Deno.serve(async (req) => {
       .from("fetch_progress")
       .upsert({
         session_id: progressSessionId,
-        state,
+        state: state || "NATIONWIDE",
         source: "USAspending.gov",
         status: "running",
         message: JSON.stringify({
@@ -152,8 +153,8 @@ Deno.serve(async (req) => {
       console.error("Error creating progress:", progressError);
     }
 
-    if (state === "ALL") {
-      EdgeRuntime.waitUntil(processAllStates(supabaseClient, startDate, endDate, progressSessionId, alnNumber));
+    if (!state || state === "ALL") {
+      EdgeRuntime.waitUntil(processAllStatesOrNationwide(supabaseClient, state, startDate, endDate, progressSessionId, alnNumber));
     } else {
       EdgeRuntime.waitUntil(processData(supabaseClient, state, startDate, endDate, progressSessionId, false, alnNumber));
     }
@@ -225,6 +226,67 @@ async function clearAllUsaspendingData(supabaseClient: any) {
   }
 
   console.log(`Cleared ${fundingIdsToClear.length} existing USAspending.gov records (ALL states)`);
+}
+
+async function processAllStatesOrNationwide(
+  supabaseClient: any,
+  state: string | undefined,
+  startDate: string | undefined,
+  endDate: string | undefined,
+  progressSessionId: string,
+  alnNumber?: string,
+) {
+  // If no state specified (ALN-only nationwide search), do a single nationwide fetch
+  if (!state) {
+    const startedAt = new Date().toISOString();
+    try {
+      await updateProgress(supabaseClient, progressSessionId, {
+        message: JSON.stringify({
+          phase: "api_fetch",
+          phaseLabel: "Fetching nationwide data by ALN...",
+          apiPagesTotal: 0,
+          apiPagesFetched: 0,
+          apiResultsTotal: 0,
+          recordsPrepared: 0,
+          recordsInserted: 0,
+          recordsTotal: 0,
+          errors: [],
+          startedAt,
+        }),
+      });
+
+      const recordsAdded = await processData(supabaseClient, undefined, startDate, endDate, progressSessionId, true, alnNumber);
+
+      await updateProgress(supabaseClient, progressSessionId, {
+        status: "completed",
+        records_inserted: recordsAdded,
+        message: JSON.stringify({
+          phase: "completed",
+          phaseLabel: `Completed! Inserted ${recordsAdded} prime awards nationwide.`,
+          recordsInserted: recordsAdded,
+          errors: [],
+          startedAt,
+          completedAt: new Date().toISOString(),
+        }),
+      });
+    } catch (error) {
+      console.error("Error in nationwide processing:", error);
+      await updateProgress(supabaseClient, progressSessionId, {
+        status: "failed",
+        errors: [error instanceof Error ? error.message : "Unknown error"],
+        message: JSON.stringify({
+          phase: "failed",
+          phaseLabel: error instanceof Error ? error.message : "Unknown error",
+          errors: [error instanceof Error ? error.message : "Unknown error"],
+          startedAt,
+        }),
+      });
+    }
+    return;
+  }
+
+  // Original ALL-states logic
+  return processAllStates(supabaseClient, startDate, endDate, progressSessionId, alnNumber);
 }
 
 async function processAllStates(
@@ -348,7 +410,7 @@ async function processAllStates(
 // Background processing function
 async function processData(
   supabaseClient: any,
-  state: string,
+  state: string | undefined,
   startDate: string | undefined,
   endDate: string | undefined,
   progressSessionId: string,
@@ -372,7 +434,7 @@ async function processData(
   } catch {}
 
   try {
-    console.log(`Fetching data for state: ${state}`);
+    console.log(`Fetching data for state: ${state || "NATIONWIDE"}`);
 
     // --- CLEAR PHASE ---
     if (!skipClear) {
@@ -446,12 +508,6 @@ async function processData(
       : currentYear;
 
     const filters: any = {
-      recipient_locations: [
-        {
-          country: "USA",
-          state: state,
-        },
-      ],
       time_period: [
         {
           start_date: startDate || `${fiscalYear}-01-01`,
@@ -472,6 +528,16 @@ async function processData(
         "National Government",
       ],
     };
+
+    // Only add state filter if state is provided
+    if (state) {
+      filters.recipient_locations = [
+        {
+          country: "USA",
+          state: state,
+        },
+      ];
+    }
 
     if (alnNumber?.trim()) {
       const alnList = alnNumber.split(",").map(c => c.trim()).filter(c => c.length > 0);
@@ -694,20 +760,53 @@ async function processData(
       }),
     });
 
-    const { data: existingOrgs } = await supabaseClient
-      .from("organizations")
-      .select("id, name")
-      .eq("state", state);
-
+    // For nationwide (no state) searches, we need to extract state from each result's Recipient Location
+    // For state-specific searches, query existing orgs by state
     const orgNameToId = new Map<string, string>();
-    (existingOrgs || []).forEach((org: any) => orgNameToId.set(org.name, org.id));
+
+    if (state) {
+      const { data: existingOrgs } = await supabaseClient
+        .from("organizations")
+        .select("id, name")
+        .eq("state", state);
+      (existingOrgs || []).forEach((org: any) => orgNameToId.set(org.name, org.id));
+    } else {
+      // For nationwide, check all existing orgs by name
+      const nameList = Array.from(uniqueOrgNames);
+      for (let i = 0; i < nameList.length; i += 200) {
+        const batch = nameList.slice(i, i + 200);
+        const { data: existingOrgs } = await supabaseClient
+          .from("organizations")
+          .select("id, name")
+          .in("name", batch);
+        (existingOrgs || []).forEach((org: any) => orgNameToId.set(org.name, org.id));
+      }
+    }
+
+    // Build a map of org name -> state from API results (for creating new orgs)
+    const orgStateMap = new Map<string, string>();
+    for (const result of allResults) {
+      const name = result["Recipient Name"];
+      if (!name || orgNameToId.has(name)) continue;
+      const loc = result["Recipient Location"];
+      let orgState = state || "US";
+      if (loc && typeof loc === "object") {
+        orgState = loc.state_code || loc.state_name || state || "US";
+      } else if (typeof loc === "string") {
+        // Try to extract state code from location string like "City, ST"
+        const parts = loc.split(",").map((s: string) => s.trim());
+        const lastPart = parts[parts.length - 1];
+        if (lastPart && lastPart.length === 2) orgState = lastPart;
+      }
+      orgStateMap.set(name, orgState);
+    }
 
     const newOrgNames = Array.from(uniqueOrgNames).filter(n => !orgNameToId.has(n));
     if (newOrgNames.length > 0) {
       for (let i = 0; i < newOrgNames.length; i += 200) {
         const batch = newOrgNames.slice(i, i + 200).map(name => ({
           name,
-          state,
+          state: orgStateMap.get(name) || state || "US",
           last_updated: new Date().toISOString().split("T")[0],
         }));
         const { data: inserted, error: insertErr } = await supabaseClient
