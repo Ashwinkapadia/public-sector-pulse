@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyTrailDiscovery } from "@/components/MoneyTrailDiscovery";
 import { GrantMonitor } from "@/components/GrantMonitor";
 import { format } from "date-fns";
+import { useFundingRecords } from "@/hooks/useFundingData";
 
 const Index = () => {
   const [selectedState, setSelectedState] = useState<string | undefined>(() => {
@@ -79,6 +80,13 @@ const Index = () => {
   const { data: savedSearches } = useSavedSearches();
   const saveSearchMutation = useSaveSearch();
   const deleteSearchMutation = useDeleteSearch();
+  const { data: dashboardFundingRecords, isLoading: isDashboardFundingLoading } = useFundingRecords(
+    selectedState,
+    startDate,
+    endDate,
+    selectedVerticals,
+    debouncedAlnFilter
+  );
 
 
   const getSessionWithTimeout = async (timeoutMs = 8000) => {
