@@ -175,6 +175,7 @@ const Index = () => {
   const [pendingAutoFetch, setPendingAutoFetch] = useState(false);
   // Use a ref to read the latest alnFilter without adding it to deps (which would cause re-runs)
   const alnFilterRef = useRef(alnFilter);
+  const attemptedAutoFetchKeyRef = useRef("");
   useEffect(() => { alnFilterRef.current = alnFilter; }, [alnFilter]);
 
   useEffect(() => {
