@@ -62,6 +62,7 @@ const Index = () => {
   const [fetchingGrants, setFetchingGrants] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [fetchSessionId, setFetchSessionId] = useState<string | null>(null);
   const [subawardsFetchSessionId, setSubawardsFetchSessionId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -153,6 +154,24 @@ const Index = () => {
       subscription.unsubscribe();
     };
   }, [navigate]);
+
+  // Re-read localStorage when switching to dashboard (e.g. from Grant Monitor export)
+  useEffect(() => {
+    if (activeTab === "dashboard") {
+      const savedAln = localStorage.getItem("dashboard_aln") || "";
+      const savedStart = localStorage.getItem("dashboard_startDate");
+      const savedEnd = localStorage.getItem("dashboard_endDate");
+      if (savedAln !== alnFilter) setAlnFilter(savedAln);
+      if (savedStart) {
+        const d = new Date(savedStart);
+        if (!startDate || d.getTime() !== startDate.getTime()) setStartDate(d);
+      }
+      if (savedEnd) {
+        const d = new Date(savedEnd);
+        if (!endDate || d.getTime() !== endDate.getTime()) setEndDate(d);
+      }
+    }
+  }, [activeTab]);
 
   // Invalidate cache when filters change so hooks refetch with new parameters.
   useEffect(() => {
@@ -653,7 +672,7 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
-        <Tabs defaultValue="dashboard" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="dashboard">Prime Awards Dashboard</TabsTrigger>
             <TabsTrigger value="money-trail">💰 Money Trail Discovery</TabsTrigger>
@@ -902,7 +921,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="grant-monitor">
-            <GrantMonitor />
+            <GrantMonitor onSwitchTab={setActiveTab} />
           </TabsContent>
         </Tabs>
       </main>
