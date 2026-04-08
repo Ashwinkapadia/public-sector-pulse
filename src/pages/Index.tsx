@@ -155,6 +155,24 @@ const Index = () => {
     };
   }, [navigate]);
 
+  // Re-read localStorage when switching to dashboard (e.g. from Grant Monitor export)
+  useEffect(() => {
+    if (activeTab === "dashboard") {
+      const savedAln = localStorage.getItem("dashboard_aln") || "";
+      const savedStart = localStorage.getItem("dashboard_startDate");
+      const savedEnd = localStorage.getItem("dashboard_endDate");
+      if (savedAln !== alnFilter) setAlnFilter(savedAln);
+      if (savedStart) {
+        const d = new Date(savedStart);
+        if (!startDate || d.getTime() !== startDate.getTime()) setStartDate(d);
+      }
+      if (savedEnd) {
+        const d = new Date(savedEnd);
+        if (!endDate || d.getTime() !== endDate.getTime()) setEndDate(d);
+      }
+    }
+  }, [activeTab]);
+
   // Invalidate cache when filters change so hooks refetch with new parameters.
   useEffect(() => {
     if (loading) return;
