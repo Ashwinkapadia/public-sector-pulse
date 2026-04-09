@@ -206,7 +206,7 @@ serve(async (req) => {
           if (detailResponse.ok) {
             const detailData = await detailResponse.json();
             const synopsis = detailData.data?.synopsis;
-            console.log(`Synopsis data for ${oppNumber}:`, JSON.stringify(synopsis).substring(0, 500));
+            console.log(`Synopsis data for ${oppNumber}:`, JSON.stringify(synopsis ?? null).substring(0, 500));
             
             // Try multiple amount fields in order of preference
             const amountCandidates = [
