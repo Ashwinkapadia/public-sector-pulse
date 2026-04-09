@@ -978,7 +978,7 @@ const Index = () => {
             <MoneyTrailDiscovery />
           </TabsContent>
 
-          <TabsContent value="grant-monitor">
+          <TabsContent value="grant-monitor" forceMount className="data-[state=inactive]:hidden">
             <GrantMonitor onSwitchTab={setActiveTab} />
           </TabsContent>
         </Tabs>
