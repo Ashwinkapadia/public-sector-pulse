@@ -134,11 +134,15 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
     },
   });
 
+  // Clear results manually
+  const clearResults = () => {
+    setResults([]);
+    setSelectedAlns(new Set());
+  };
+
   // Search Grants.gov
   const handleSearch = async () => {
     setLoading(true);
-    setResults([]);
-    setSelectedAlns(new Set());
     try {
       const alnPrefixes =
         selectedVerticals.length > 0
@@ -152,6 +156,7 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
       );
 
       setResults(data.results || []);
+      setSelectedAlns(new Set());
       toast({
         title: "Search Complete",
         description: `Found ${data.results?.length || 0} grants (${new Set(data.results?.map((r) => r.aln).filter(Boolean)).size} unique ALNs)`,
