@@ -879,7 +879,6 @@ const Index = () => {
                     <Button
                       onClick={handleFetchGrantsData}
                       disabled={fetchingGrants || !selectedState}
-                      disabled={fetchingGrants || (!selectedState && !alnFilter.trim())}
                       className="gap-2"
                       size="lg"
                       variant="secondary"
@@ -890,7 +889,6 @@ const Index = () => {
                     <Button
                       onClick={handleFetchNASBOData}
                       disabled={fetchingNASBO || !selectedState}
-                      disabled={fetchingNASBO || (!selectedState && !alnFilter.trim())}
                       className="gap-2"
                       size="lg"
                       variant="outline"
