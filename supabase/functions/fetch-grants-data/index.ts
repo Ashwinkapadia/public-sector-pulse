@@ -11,6 +11,7 @@ interface RequestBody {
   state?: string;
   startDate?: string;
   endDate?: string;
+  alnNumber?: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -92,16 +93,17 @@ serve(async (req) => {
       });
     }
 
-    const { state, startDate, endDate }: RequestBody = await req.json();
+    const { state, startDate, endDate, alnNumber }: RequestBody = await req.json();
 
-    if (!state) {
+    if (!state && !alnNumber?.trim()) {
       return new Response(
-        JSON.stringify({ error: "State is required" }),
+        JSON.stringify({ error: "State or ALN number is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Fetching Grants.gov data for ${state}`, { startDate, endDate });
+    const effectiveState = state || "US";
+    console.log(`Fetching Grants.gov data for ${effectiveState}`, { startDate, endDate, alnNumber });
 
     // Initialize Supabase client - use service role only after confirming admin privileges
     const supabaseClient = createClient(
@@ -110,13 +112,20 @@ serve(async (req) => {
     );
 
     // CRITICAL: ensure each search cycle starts clean for this source/state.
-    await clearGrantsGovForState(supabaseClient, state);
+    if (state) {
+      await clearGrantsGovForState(supabaseClient, state);
+    }
 
     // Fetch data from Grants.gov API using POST as documented for search2
     const requestBody: Record<string, unknown> = {
       rows: 50, // Fetch 50 opportunities
       oppStatuses: "forecasted|posted", // Get active opportunities
     };
+
+    // If ALN/CFDA provided, add it as keyword to narrow results
+    if (alnNumber?.trim()) {
+      requestBody.keyword = alnNumber.trim();
+    }
 
     // Grants.gov search2 does not support explicit state filtering,
     // so we fetch all opportunities without state keyword filtering
@@ -349,7 +358,7 @@ serve(async (req) => {
           .from("organizations")
           .select("id")
           .eq("name", agency)
-          .eq("state", state)
+          .eq("state", effectiveState)
           .single();
 
         let organizationId = existingOrg?.id;
@@ -359,7 +368,7 @@ serve(async (req) => {
             .from("organizations")
             .upsert({
               name: agency,
-              state: state,
+              state: effectiveState,
               description: `Federal agency: ${agency}`,
               last_updated: new Date().toISOString().split("T")[0],
             }, { onConflict: "name,state" })
