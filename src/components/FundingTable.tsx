@@ -34,7 +34,12 @@ type SortOrder = "asc" | "desc";
 
 export function FundingTable({ state, verticalIds, startDate, endDate, alnFilter }: FundingTableProps) {
   // Now passes verticalIds to the hook so filtering happens server-side
-  const { data: fundingRecords, isLoading } = useFundingRecords(state, startDate, endDate, verticalIds, alnFilter);
+  const {
+    data: fundingRecords,
+    isLoading,
+    isError,
+    error,
+  } = useFundingRecords(state, startDate, endDate, verticalIds, alnFilter);
   const { data: assignments } = useRepAssignments();
   const [sortField, setSortField] = useState<SortField>("funding");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -225,6 +230,16 @@ export function FundingTable({ state, verticalIds, startDate, endDate, alnFilter
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-muted rounded w-1/3" />
           <div className="h-64 bg-muted rounded" />
+        </div>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card className="p-6">
+        <div className="text-sm text-destructive">
+          Failed to load funding records: {error instanceof Error ? error.message : "Unknown error"}
         </div>
       </Card>
     );
@@ -428,7 +443,7 @@ export function FundingTable({ state, verticalIds, startDate, endDate, alnFilter
             ) : (
               <TableRow>
                 <TableCell colSpan={9} className="text-center text-muted-foreground">
-                  No funding records found. Add data to get started.
+                  No funding records matched the current filters.
                 </TableCell>
               </TableRow>
             )}

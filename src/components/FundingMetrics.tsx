@@ -35,7 +35,12 @@ interface FundingMetricsProps {
 }
 
 export function FundingMetrics({ state, startDate, endDate, verticalIds, alnFilter }: FundingMetricsProps) {
-  const { data: metrics, isLoading } = useFundingMetrics(state, startDate, endDate, verticalIds, alnFilter);
+  const {
+    data: metrics,
+    isLoading,
+    isError,
+    error,
+  } = useFundingMetrics(state, startDate, endDate, verticalIds, alnFilter);
 
   if (isLoading) {
     return (
@@ -46,6 +51,16 @@ export function FundingMetrics({ state, startDate, endDate, verticalIds, alnFilt
           </Card>
         ))}
       </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card className="p-6">
+        <div className="text-sm text-destructive">
+          Failed to load funding metrics: {error instanceof Error ? error.message : "Unknown error"}
+        </div>
+      </Card>
     );
   }
 

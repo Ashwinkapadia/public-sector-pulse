@@ -22,8 +22,18 @@ interface FundingChartProps {
 
 export function FundingChart({ state, startDate, endDate, verticalIds, alnFilter }: FundingChartProps) {
   // Now passes verticalIds so the chart only fetches data for selected verticals
-  const { data: fundingRecords, isLoading: loadingRecords } = useFundingRecords(state, startDate, endDate, verticalIds, alnFilter);
-  const { data: verticals, isLoading: loadingVerticals } = useVerticals();
+  const {
+    data: fundingRecords,
+    isLoading: loadingRecords,
+    isError: hasFundingError,
+    error: fundingError,
+  } = useFundingRecords(state, startDate, endDate, verticalIds, alnFilter);
+  const {
+    data: verticals,
+    isLoading: loadingVerticals,
+    isError: hasVerticalsError,
+    error: verticalsError,
+  } = useVerticals();
 
   const chartData = useMemo(() => {
     if (!fundingRecords || !verticals) return [];
@@ -64,6 +74,22 @@ export function FundingChart({ state, startDate, endDate, verticalIds, alnFilter
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-muted rounded w-1/3" />
           <div className="h-96 bg-muted rounded" />
+        </div>
+      </Card>
+    );
+  }
+
+  if (hasFundingError || hasVerticalsError) {
+    const message = fundingError instanceof Error
+      ? fundingError.message
+      : verticalsError instanceof Error
+        ? verticalsError.message
+        : "Unknown error";
+
+    return (
+      <Card className="p-6">
+        <div className="text-sm text-destructive">
+          Failed to load the funding chart: {message}
         </div>
       </Card>
     );

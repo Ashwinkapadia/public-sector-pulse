@@ -234,7 +234,12 @@ export function useFundingMetrics(
           }
         }
 
-        const { data } = await fundingQuery;
+        const { data, error } = await fundingQuery;
+        if (error) {
+          console.error("[useFundingMetrics] Supabase error:", error);
+          throw error;
+        }
+
         const rows = data || [];
         allData = allData.concat(rows);
         hasMore = rows.length === PAGE_SIZE;
