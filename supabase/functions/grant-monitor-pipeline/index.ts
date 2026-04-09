@@ -305,6 +305,9 @@ async function searchGrantsGov(alnPrefixes: string[]): Promise<any[]> {
 }
 
 // ─── Run full pipeline ───
+const PIPELINE_TIMEOUT_MS = 150_000; // 2.5 minutes - leave buffer before edge function kills us
+const MAX_PAGES_PER_ALN = 10; // Cap pages per ALN to avoid runaway fetches
+
 async function runPipeline(
   serviceClient: any,
   runId: string,
@@ -314,16 +317,16 @@ async function runPipeline(
   explicitStartDate?: string,
   explicitEndDate?: string
 ) {
+  const pipelineStart = Date.now();
+
   try {
     let startStr: string;
     let endStr: string;
 
     if (explicitStartDate && explicitEndDate) {
-      // Use the exact date range from the user's search filters
       startStr = explicitStartDate;
       endStr = explicitEndDate;
     } else {
-      // Fallback to lookback months
       const endDate = new Date();
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - lookbackMonths);
@@ -333,13 +336,22 @@ async function runPipeline(
 
     let totalPrime = 0;
     let totalSub = 0;
+    let processedAlns = 0;
+    let timedOut = false;
     const csvRows: string[] = [
       "Type,ALN,Recipient,Amount,Agency,Start Date,End Date,Description",
     ];
 
     for (const aln of alns) {
-      // Fetch prime awards
-      const primeResults = await fetchUSASpendingAwards(aln, startStr, endStr, "prime");
+      // Check timeout before each ALN
+      if (Date.now() - pipelineStart > PIPELINE_TIMEOUT_MS) {
+        console.warn(`Pipeline timeout after processing ${processedAlns}/${alns.length} ALNs`);
+        timedOut = true;
+        break;
+      }
+
+      // Fetch prime awards (with reduced page cap)
+      const primeResults = await fetchUSASpendingAwards(aln, startStr, endStr, "prime", MAX_PAGES_PER_ALN);
       totalPrime += primeResults.length;
 
       for (const award of primeResults) {
@@ -348,8 +360,16 @@ async function runPipeline(
         );
       }
 
+      // Check timeout again before sub-awards
+      if (Date.now() - pipelineStart > PIPELINE_TIMEOUT_MS) {
+        console.warn(`Pipeline timeout after prime awards for ALN ${aln}`);
+        timedOut = true;
+        processedAlns++;
+        break;
+      }
+
       // Fetch sub-awards
-      const subResults = await fetchUSASpendingAwards(aln, startStr, endStr, "sub");
+      const subResults = await fetchUSASpendingAwards(aln, startStr, endStr, "sub", MAX_PAGES_PER_ALN);
       totalSub += subResults.length;
 
       for (const sub of subResults) {
@@ -357,6 +377,8 @@ async function runPipeline(
           `Sub-Award,${aln},"${escapeCsv(sub.recipientName)}",${sub.amount},"${escapeCsv(sub.agency || "")}",${sub.date || ""},${""},"${escapeCsv(sub.description)}"`
         );
       }
+
+      processedAlns++;
     }
 
     const csvContent = csvRows.join("\n");
