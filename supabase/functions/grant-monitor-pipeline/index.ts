@@ -412,14 +412,17 @@ async function runPipeline(
     }
 
     // Update run with results
+    const finalStatus = timedOut ? "partial" : "completed";
+    const errorMsg = timedOut ? `Processed ${processedAlns}/${alns.length} ALNs before timeout` : null;
     await serviceClient
       .from("grant_monitor_runs")
       .update({
-        status: "completed",
+        status: finalStatus,
         prime_awards_found: totalPrime,
         sub_awards_found: totalSub,
         completed_at: new Date().toISOString(),
         csv_url: csvUrl,
+        error_message: errorMsg,
       })
       .eq("id", runId);
 
@@ -449,10 +452,10 @@ async function fetchUSASpendingAwards(
   aln: string,
   startDate: string,
   endDate: string,
-  type: "prime" | "sub"
+  type: "prime" | "sub",
+  maxPages: number = 100
 ): Promise<any[]> {
   const PAGE_SIZE = 100;
-  const MAX_PAGES = 100;
 
   const filters = {
     time_period: [{ start_date: startDate, end_date: endDate }],
