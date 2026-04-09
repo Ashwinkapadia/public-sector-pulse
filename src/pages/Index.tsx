@@ -150,28 +150,22 @@ const Index = () => {
     };
   }, [navigate]);
 
+  // When switching TO the dashboard tab, hydrate filters from localStorage once
+  // (e.g. after Grant Monitor exports ALNs).
+  const prevTabRef = useRef(activeTab);
   useEffect(() => {
-    if (activeTab === "dashboard") {
+    if (activeTab === "dashboard" && prevTabRef.current !== "dashboard") {
       const savedAln = localStorage.getItem("dashboard_aln") || "";
       const savedStart = localStorage.getItem("dashboard_startDate");
       const savedEnd = localStorage.getItem("dashboard_endDate");
-      localStorage.removeItem("dashboard_autoFetch");
 
-      if (savedAln !== alnFilter) {
-        setAlnFilter(savedAln);
-      }
-      if (savedStart) {
-        const d = new Date(savedStart);
-        if (!startDate || d.getTime() !== startDate.getTime()) { setStartDate(d); }
-      }
-      if (savedEnd) {
-        const d = new Date(savedEnd);
-        if (!endDate || d.getTime() !== endDate.getTime()) { setEndDate(d); }
-      }
-
+      if (savedAln) setAlnFilter(savedAln);
+      if (savedStart) setStartDate(new Date(savedStart));
+      if (savedEnd) setEndDate(new Date(savedEnd));
       setHasAppliedSearch(false);
     }
-  }, [activeTab, alnFilter, endDate, startDate]);
+    prevTabRef.current = activeTab;
+  }, [activeTab]);
 
   const startPrimeAwardsFetch = useCallback(async (
     alnValue?: string,
