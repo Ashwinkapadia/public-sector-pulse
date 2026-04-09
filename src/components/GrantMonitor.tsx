@@ -403,6 +403,10 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
                 <Button variant="outline" size="sm" onClick={deselectAllAlns}>
                   Deselect All
                 </Button>
+                <Button variant="destructive" size="sm" onClick={clearResults} className="gap-1">
+                  <Trash2 className="h-4 w-4" />
+                  Clear Results
+                </Button>
               </div>
             </div>
           </CardHeader>
