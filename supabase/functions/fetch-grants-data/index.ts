@@ -399,7 +399,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Create funding record - use postedDate as action_date for date filtering
+        // Create funding record - leave action_date null so the frontend
+        // date filter uses date_range_start/date_range_end overlap logic
         const { data: fundingRecord, error: fundingError } = await supabaseClient
           .from("funding_records")
           .insert({
@@ -410,7 +411,7 @@ serve(async (req) => {
             fiscal_year: fiscalYear,
             source: "Grants.gov",
             cfda_code: cfdaNumber,
-            action_date: postedDate, // Use parsed openDate for consistent date filtering
+            action_date: null,
             date_range_start: postedDate,
             date_range_end: closeDate,
             notes: `${oppTitle} (${oppNumber})`,
