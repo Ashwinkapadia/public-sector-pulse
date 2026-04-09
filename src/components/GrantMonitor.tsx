@@ -799,12 +799,15 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
                           variant={
                             run.status === "completed"
                               ? "default"
+                              : run.status === "partial"
+                              ? "outline"
                               : run.status === "running"
                               ? "secondary"
                               : "destructive"
                           }
+                          title={run.error_message || ""}
                         >
-                          {run.status}
+                          {run.status === "partial" ? "partial ⚠️" : run.status}
                         </Badge>
                       </TableCell>
                       <TableCell>{run.grants_found}</TableCell>
