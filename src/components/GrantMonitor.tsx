@@ -799,12 +799,15 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
                           variant={
                             run.status === "completed"
                               ? "default"
+                              : run.status === "partial"
+                              ? "outline"
                               : run.status === "running"
                               ? "secondary"
                               : "destructive"
                           }
+                          title={run.error_message || ""}
                         >
-                          {run.status}
+                          {run.status === "partial" ? "partial ⚠️" : run.status}
                         </Badge>
                       </TableCell>
                       <TableCell>{run.grants_found}</TableCell>
@@ -823,7 +826,7 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
                           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                         ) : run.error_message ? (
                           <span className="text-xs text-destructive" title={run.error_message}>
-                            Error
+                            {run.status === "partial" ? "Partial" : "Error"}
                           </span>
                         ) : (
                           "—"

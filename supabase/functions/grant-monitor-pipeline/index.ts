@@ -305,6 +305,9 @@ async function searchGrantsGov(alnPrefixes: string[]): Promise<any[]> {
 }
 
 // ─── Run full pipeline ───
+const PIPELINE_TIMEOUT_MS = 150_000; // 2.5 minutes - leave buffer before edge function kills us
+const MAX_PAGES_PER_ALN = 10; // Cap pages per ALN to avoid runaway fetches
+
 async function runPipeline(
   serviceClient: any,
   runId: string,
@@ -314,16 +317,16 @@ async function runPipeline(
   explicitStartDate?: string,
   explicitEndDate?: string
 ) {
+  const pipelineStart = Date.now();
+
   try {
     let startStr: string;
     let endStr: string;
 
     if (explicitStartDate && explicitEndDate) {
-      // Use the exact date range from the user's search filters
       startStr = explicitStartDate;
       endStr = explicitEndDate;
     } else {
-      // Fallback to lookback months
       const endDate = new Date();
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - lookbackMonths);
@@ -333,13 +336,22 @@ async function runPipeline(
 
     let totalPrime = 0;
     let totalSub = 0;
+    let processedAlns = 0;
+    let timedOut = false;
     const csvRows: string[] = [
       "Type,ALN,Recipient,Amount,Agency,Start Date,End Date,Description",
     ];
 
     for (const aln of alns) {
-      // Fetch prime awards
-      const primeResults = await fetchUSASpendingAwards(aln, startStr, endStr, "prime");
+      // Check timeout before each ALN
+      if (Date.now() - pipelineStart > PIPELINE_TIMEOUT_MS) {
+        console.warn(`Pipeline timeout after processing ${processedAlns}/${alns.length} ALNs`);
+        timedOut = true;
+        break;
+      }
+
+      // Fetch prime awards (with reduced page cap)
+      const primeResults = await fetchUSASpendingAwards(aln, startStr, endStr, "prime", MAX_PAGES_PER_ALN);
       totalPrime += primeResults.length;
 
       for (const award of primeResults) {
@@ -348,8 +360,16 @@ async function runPipeline(
         );
       }
 
+      // Check timeout again before sub-awards
+      if (Date.now() - pipelineStart > PIPELINE_TIMEOUT_MS) {
+        console.warn(`Pipeline timeout after prime awards for ALN ${aln}`);
+        timedOut = true;
+        processedAlns++;
+        break;
+      }
+
       // Fetch sub-awards
-      const subResults = await fetchUSASpendingAwards(aln, startStr, endStr, "sub");
+      const subResults = await fetchUSASpendingAwards(aln, startStr, endStr, "sub", MAX_PAGES_PER_ALN);
       totalSub += subResults.length;
 
       for (const sub of subResults) {
@@ -357,6 +377,8 @@ async function runPipeline(
           `Sub-Award,${aln},"${escapeCsv(sub.recipientName)}",${sub.amount},"${escapeCsv(sub.agency || "")}",${sub.date || ""},${""},"${escapeCsv(sub.description)}"`
         );
       }
+
+      processedAlns++;
     }
 
     const csvContent = csvRows.join("\n");
@@ -390,14 +412,17 @@ async function runPipeline(
     }
 
     // Update run with results
+    const finalStatus = timedOut ? "partial" : "completed";
+    const errorMsg = timedOut ? `Processed ${processedAlns}/${alns.length} ALNs before timeout` : null;
     await serviceClient
       .from("grant_monitor_runs")
       .update({
-        status: "completed",
+        status: finalStatus,
         prime_awards_found: totalPrime,
         sub_awards_found: totalSub,
         completed_at: new Date().toISOString(),
         csv_url: csvUrl,
+        error_message: errorMsg,
       })
       .eq("id", runId);
 
@@ -427,10 +452,10 @@ async function fetchUSASpendingAwards(
   aln: string,
   startDate: string,
   endDate: string,
-  type: "prime" | "sub"
+  type: "prime" | "sub",
+  maxPages: number = 100
 ): Promise<any[]> {
   const PAGE_SIZE = 100;
-  const MAX_PAGES = 100;
 
   const filters = {
     time_period: [{ start_date: startDate, end_date: endDate }],
@@ -448,7 +473,7 @@ async function fetchUSASpendingAwards(
   const allResults: any[] = [];
   let page = 1;
 
-  while (page <= MAX_PAGES) {
+  while (page <= maxPages) {
     // Both prime and sub use the same endpoint; subawards flag differentiates
     const endpoint = "https://api.usaspending.gov/api/v2/search/spending_by_award/";
 
