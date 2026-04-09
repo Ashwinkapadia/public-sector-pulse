@@ -427,17 +427,18 @@ const Index = () => {
       return;
     }
 
-    if (!selectedState) {
+    if (!selectedState && !alnFilter.trim()) {
       toast({
         variant: "destructive",
-        title: "State Required",
-        description: "Please select a state before fetching data",
+        title: "State or ALN Required",
+        description: "Please select a state or enter ALN numbers before fetching data",
       });
       return;
     }
 
     await applyDashboardFilters();
     setFetchingNASBO(true);
+
     
     try {
       const { data, error } = await invokeWithAuth("fetch-nasbo-data", {
@@ -479,11 +480,11 @@ const Index = () => {
       return;
     }
 
-    if (!selectedState) {
+    if (!selectedState && !alnFilter.trim()) {
       toast({
         variant: "destructive",
-        title: "State Required",
-        description: "Please select a state before fetching data",
+        title: "State or ALN Required",
+        description: "Please select a state or enter ALN numbers before fetching data",
       });
       return;
     }
@@ -877,7 +878,7 @@ const Index = () => {
                     </Button>
                     <Button
                       onClick={handleFetchGrantsData}
-                      disabled={fetchingGrants || !selectedState}
+                      disabled={fetchingGrants || (!selectedState && !alnFilter.trim())}
                       className="gap-2"
                       size="lg"
                       variant="secondary"
@@ -887,7 +888,7 @@ const Index = () => {
                     </Button>
                     <Button
                       onClick={handleFetchNASBOData}
-                      disabled={fetchingNASBO || !selectedState}
+                      disabled={fetchingNASBO || (!selectedState && !alnFilter.trim())}
                       className="gap-2"
                       size="lg"
                       variant="outline"
