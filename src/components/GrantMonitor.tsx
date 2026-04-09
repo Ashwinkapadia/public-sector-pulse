@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const VERTICAL_OPTIONS = Object.keys(VERTICAL_MAPPINGS);
+const GRANT_MONITOR_STORAGE_KEY = "grant_monitor_state";
 
 interface Schedule {
   id: string;
@@ -65,16 +66,69 @@ interface GrantMonitorProps {
 
 export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
   // Search filters
-  const [startDate, setStartDate] = useState(
-    format(subDays(new Date(), 180), "yyyy-MM-dd")
-  );
-  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [selectedVerticals, setSelectedVerticals] = useState<string[]>([]);
+  const [startDate, setStartDate] = useState(() => {
+    if (typeof window === "undefined") return format(subDays(new Date(), 180), "yyyy-MM-dd");
+    const saved = localStorage.getItem(GRANT_MONITOR_STORAGE_KEY);
+    if (!saved) return format(subDays(new Date(), 180), "yyyy-MM-dd");
+
+    try {
+      const parsed = JSON.parse(saved) as { startDate?: string };
+      return parsed.startDate || format(subDays(new Date(), 180), "yyyy-MM-dd");
+    } catch {
+      return format(subDays(new Date(), 180), "yyyy-MM-dd");
+    }
+  });
+  const [endDate, setEndDate] = useState(() => {
+    if (typeof window === "undefined") return format(new Date(), "yyyy-MM-dd");
+    const saved = localStorage.getItem(GRANT_MONITOR_STORAGE_KEY);
+    if (!saved) return format(new Date(), "yyyy-MM-dd");
+
+    try {
+      const parsed = JSON.parse(saved) as { endDate?: string };
+      return parsed.endDate || format(new Date(), "yyyy-MM-dd");
+    } catch {
+      return format(new Date(), "yyyy-MM-dd");
+    }
+  });
+  const [selectedVerticals, setSelectedVerticals] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    const saved = localStorage.getItem(GRANT_MONITOR_STORAGE_KEY);
+    if (!saved) return [];
+
+    try {
+      const parsed = JSON.parse(saved) as { selectedVerticals?: string[] };
+      return Array.isArray(parsed.selectedVerticals) ? parsed.selectedVerticals : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<DiscoveredGrant[]>([]);
+  const [results, setResults] = useState<DiscoveredGrant[]>(() => {
+    if (typeof window === "undefined") return [];
+    const saved = localStorage.getItem(GRANT_MONITOR_STORAGE_KEY);
+    if (!saved) return [];
+
+    try {
+      const parsed = JSON.parse(saved) as { results?: DiscoveredGrant[] };
+      return Array.isArray(parsed.results) ? parsed.results : [];
+    } catch {
+      return [];
+    }
+  });
 
   // ALN selection for export
-  const [selectedAlns, setSelectedAlns] = useState<Set<string>>(new Set());
+  const [selectedAlns, setSelectedAlns] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    const saved = localStorage.getItem(GRANT_MONITOR_STORAGE_KEY);
+    if (!saved) return new Set();
+
+    try {
+      const parsed = JSON.parse(saved) as { selectedAlns?: string[] };
+      return new Set(Array.isArray(parsed.selectedAlns) ? parsed.selectedAlns : []);
+    } catch {
+      return new Set();
+    }
+  });
 
   // Schedule dialog
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
@@ -86,6 +140,19 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    localStorage.setItem(
+      GRANT_MONITOR_STORAGE_KEY,
+      JSON.stringify({
+        startDate,
+        endDate,
+        selectedVerticals,
+        results,
+        selectedAlns: Array.from(selectedAlns),
+      })
+    );
+  }, [startDate, endDate, selectedVerticals, results, selectedAlns]);
 
   // Extract unique ALNs from results
   const uniqueAlns = Array.from(
@@ -138,6 +205,16 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
   const clearResults = () => {
     setResults([]);
     setSelectedAlns(new Set());
+    localStorage.setItem(
+      GRANT_MONITOR_STORAGE_KEY,
+      JSON.stringify({
+        startDate,
+        endDate,
+        selectedVerticals,
+        results: [],
+        selectedAlns: [],
+      })
+    );
   };
 
   // Search Grants.gov
