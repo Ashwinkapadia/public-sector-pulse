@@ -1,0 +1,1 @@
+UPDATE funding_records SET action_date = NULL WHERE source = 'Grants.gov';
