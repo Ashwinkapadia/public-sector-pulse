@@ -271,13 +271,15 @@ serve(async (req) => {
         const postedDate = parseGrantsGovDate(rawOpenDate);
         const closeDate = parseGrantsGovDate(rawCloseDate);
 
-        // Apply requested date range to the *posting date* (openDate/postDate).
-        // This prevents inserting out-of-range opportunities that will later look like “old records”.
+        // Apply requested date range: keep the grant if its active window
+        // (openDate → closeDate) overlaps with the user's selected range.
         const startBound = parseGrantsGovDate(startDate);
         const endBound = parseGrantsGovDate(endDate);
-        if (postedDate) {
-          if (startBound && postedDate < startBound) continue;
-          if (endBound && postedDate > endBound) continue;
+        if (startBound || endBound) {
+          const grantStart = postedDate;
+          const grantEnd = closeDate;
+          if (startBound && grantEnd && grantEnd < startBound) continue;
+          if (endBound && grantStart && grantStart > endBound) continue;
         }
         const fiscalYear = postedDate ? new Date(postedDate).getFullYear() : new Date().getFullYear();
         
