@@ -826,7 +826,7 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
                           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                         ) : run.error_message ? (
                           <span className="text-xs text-destructive" title={run.error_message}>
-                            Error
+                            {run.status === "partial" ? "Partial" : "Error"}
                           </span>
                         ) : (
                           "—"
