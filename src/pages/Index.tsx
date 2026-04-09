@@ -241,7 +241,7 @@ const Index = () => {
     }
   }, [alnFilter, endDate, fetching, isAdmin, selectedState, startDate, toast]);
 
-  const handleApplyDashboardSearch = async () => {
+  const applyDashboardFilters = async () => {
     setAppliedState(selectedState);
     setAppliedStartDate(startDate);
     setAppliedEndDate(endDate);
@@ -327,6 +327,7 @@ const Index = () => {
   };
 
   const handleFetchUSASpendingData = async () => {
+    await applyDashboardFilters();
     await startPrimeAwardsFetch();
   };
 
@@ -441,6 +442,7 @@ const Index = () => {
       return;
     }
 
+    await applyDashboardFilters();
     setFetchingNASBO(true);
     
     try {
@@ -492,6 +494,7 @@ const Index = () => {
       return;
     }
 
+    await applyDashboardFilters();
     setFetchingGrants(true);
     
     try {
@@ -653,7 +656,7 @@ const Index = () => {
       localStorage.removeItem("dashboard_hasAppliedSearch");
       toast({
         title: "Search loaded",
-        description: `Loaded search: ${search.name}. Click Search Dashboard to apply it.`,
+        description: `Loaded search: ${search.name}. Click a source button to run it.`,
       });
     }
   };
@@ -855,7 +858,7 @@ const Index = () => {
                   <div>
                     {hasAppliedSearch
                       ? `Applied search: state=${appliedState || "(none)"} • ALN=${appliedAlnFilter || "(none)"} • start=${appliedStartDate ? format(appliedStartDate, "yyyy-MM-dd") : "(none)"} • end=${appliedEndDate ? format(appliedEndDate, "yyyy-MM-dd") : "(none)"} • verticals=${appliedVerticals.length}`
-                      : "Results update only after you click Search Dashboard."}
+                      : "Results update only after you click one of the source buttons below."}
                   </div>
                 </div>
 
@@ -864,15 +867,6 @@ const Index = () => {
                     selectedVerticals={selectedVerticals}
                     onSelectVerticals={setSelectedVerticals}
                   />
-                </div>
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <Button onClick={handleApplyDashboardSearch} className="gap-2" size="lg">
-                    <Search className="h-4 w-4" />
-                    Search Dashboard
-                  </Button>
-                  <p className="text-sm text-muted-foreground">
-                    You can set all filters first. Results only refresh when you click Search Dashboard.
-                  </p>
                 </div>
                 {/* Prime Awards Fetch Section */}
                 <div className="mt-6">
@@ -973,7 +967,7 @@ const Index = () => {
             ) : (
               <section className="mb-8">
                 <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
-                  Set your filters, then click <span className="font-medium text-foreground">Search Dashboard</span> to load results.
+                  Set your filters, then click one of the <span className="font-medium text-foreground">source buttons</span> to load results.
                 </div>
               </section>
             )}

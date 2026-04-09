@@ -204,7 +204,7 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
     localStorage.removeItem("dashboard_autoFetch");
     toast({
       title: "ALNs Exported",
-      description: `${selectedAlns.size} ALN(s) sent to Prime Awards Dashboard. Click Search Dashboard to run it.`,
+      description: `${selectedAlns.size} ALN(s) sent to Prime Awards Dashboard. Click a source button there to run it.`,
     });
     onSwitchTab?.("dashboard");
   };
