@@ -158,11 +158,23 @@ const Index = () => {
       const savedAln = localStorage.getItem("dashboard_aln") || "";
       const savedStart = localStorage.getItem("dashboard_startDate");
       const savedEnd = localStorage.getItem("dashboard_endDate");
+      const shouldAutoFetch = localStorage.getItem("dashboard_autoFetch") === "true";
 
       if (savedAln) setAlnFilter(savedAln);
       if (savedStart) setStartDate(new Date(savedStart));
       if (savedEnd) setEndDate(new Date(savedEnd));
-      setHasAppliedSearch(false);
+
+      if (shouldAutoFetch && savedAln) {
+        localStorage.removeItem("dashboard_autoFetch");
+        // Auto-apply filters and trigger fetch after state updates settle
+        setTimeout(() => {
+          applyDashboardFilters().then(() => {
+            startPrimeAwardsFetch(savedAln);
+          });
+        }, 100);
+      } else {
+        setHasAppliedSearch(false);
+      }
     }
     prevTabRef.current = activeTab;
   }, [activeTab]);
