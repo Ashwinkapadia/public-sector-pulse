@@ -473,7 +473,7 @@ async function fetchUSASpendingAwards(
   const allResults: any[] = [];
   let page = 1;
 
-  while (page <= MAX_PAGES) {
+  while (page <= maxPages) {
     // Both prime and sub use the same endpoint; subawards flag differentiates
     const endpoint = "https://api.usaspending.gov/api/v2/search/spending_by_award/";
 
