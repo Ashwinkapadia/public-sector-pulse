@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 // Declare EdgeRuntime for background tasks
 declare const EdgeRuntime: {
@@ -27,6 +27,7 @@ Deno.serve(async (req) => {
   try {
     // Verify authentication
     const authHeader = req.headers.get('Authorization');
+    console.log("Auth header present:", !!authHeader);
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -34,7 +35,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create client with anon key to verify the user token
     const authClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
@@ -42,6 +42,7 @@ Deno.serve(async (req) => {
     );
 
     const { data: { user }, error: authError } = await authClient.auth.getUser();
+    console.log("getUser result:", user?.id, "error:", authError?.message);
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -51,8 +52,14 @@ Deno.serve(async (req) => {
 
     const userId = user.id;
 
-    // Verify admin role
-    const { data: roleData, error: roleError } = await authClient
+    // Use service role client for admin check and data operations
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Verify admin role using service role client (bypasses RLS)
+    const { data: roleData, error: roleError } = await supabaseClient
       .from('user_roles')
       .select('role')
       .eq('user_id', userId)
@@ -78,11 +85,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use service role client only after confirming admin privileges
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    // supabaseClient already created above with service role
 
     // Create progress tracking session
     const progressSessionId = sessionId || crypto.randomUUID();
