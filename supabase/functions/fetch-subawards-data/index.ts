@@ -85,11 +85,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use service role client only after confirming admin privileges
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    // supabaseClient already created above with service role
 
     // Create progress tracking session
     const progressSessionId = sessionId || crypto.randomUUID();
