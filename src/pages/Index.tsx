@@ -882,8 +882,8 @@ const Index = () => {
                   </div>
                   <div>
                     {hasAppliedSearch
-                      ? `Applied search: state=${appliedState || "(none)"} • ALN=${appliedAlnFilter || "(none)"} • start=${appliedStartDate ? format(appliedStartDate, "yyyy-MM-dd") : "(none)"} • end=${appliedEndDate ? format(appliedEndDate, "yyyy-MM-dd") : "(none)"} • verticals=${appliedVerticals.length}`
-                      : "Results update only after you click one of the source buttons below."}
+                      ? `Active filters: state=${appliedState || "(all)"} • ALN=${appliedAlnFilter || "(all)"} • start=${appliedStartDate ? format(appliedStartDate, "yyyy-MM-dd") : "(any)"} • end=${appliedEndDate ? format(appliedEndDate, "yyyy-MM-dd") : "(any)"} • verticals=${appliedVerticals.length || "all"}`
+                      : "Click a source button below to fetch data. Once loaded, filters apply automatically."}
                   </div>
                 </div>
 
