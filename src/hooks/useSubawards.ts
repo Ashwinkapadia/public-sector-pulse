@@ -55,8 +55,8 @@ export function useSubawardsByState(state?: string, startDate?: Date, endDate?: 
 
   return useQuery({
     queryKey: ["subawards-by-state", state, startKey, endKey],
-    staleTime: 0,
-    refetchOnMount: "always",
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     queryFn: async () => {
       console.log("[useSubawardsByState] Fetching", { state, startKey, endKey });
       let query = supabase

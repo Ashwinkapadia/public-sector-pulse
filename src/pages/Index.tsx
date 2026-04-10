@@ -43,12 +43,29 @@ const Index = () => {
   const [alnFilter, setAlnFilter] = useState<string>(() => {
     return localStorage.getItem("dashboard_aln") || "";
   });
-  const [appliedState, setAppliedState] = useState<string | undefined>();
-  const [appliedStartDate, setAppliedStartDate] = useState<Date | undefined>();
-  const [appliedEndDate, setAppliedEndDate] = useState<Date | undefined>();
-  const [appliedVerticals, setAppliedVerticals] = useState<string[]>([]);
-  const [appliedAlnFilter, setAppliedAlnFilter] = useState("");
-  const [hasAppliedSearch, setHasAppliedSearch] = useState(false);
+  const savedHasApplied = localStorage.getItem("dashboard_hasAppliedSearch") === "true";
+  const [appliedState, setAppliedState] = useState<string | undefined>(() => {
+    return savedHasApplied ? (localStorage.getItem("dashboard_state") || undefined) : undefined;
+  });
+  const [appliedStartDate, setAppliedStartDate] = useState<Date | undefined>(() => {
+    if (!savedHasApplied) return undefined;
+    const saved = localStorage.getItem("dashboard_startDate");
+    return saved ? new Date(saved) : undefined;
+  });
+  const [appliedEndDate, setAppliedEndDate] = useState<Date | undefined>(() => {
+    if (!savedHasApplied) return undefined;
+    const saved = localStorage.getItem("dashboard_endDate");
+    return saved ? new Date(saved) : undefined;
+  });
+  const [appliedVerticals, setAppliedVerticals] = useState<string[]>(() => {
+    if (!savedHasApplied) return [];
+    const saved = localStorage.getItem("dashboard_verticals");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [appliedAlnFilter, setAppliedAlnFilter] = useState(() => {
+    return savedHasApplied ? (localStorage.getItem("dashboard_aln") || "") : "";
+  });
+  const [hasAppliedSearch, setHasAppliedSearch] = useState(savedHasApplied);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [fetching, setFetching] = useState(false);
