@@ -276,6 +276,17 @@ const Index = () => {
     else localStorage.removeItem("dashboard_aln");
   }, [selectedState, startDate, endDate, selectedVerticals, alnFilter]);
 
+  // Auto-apply filters to the already-loaded dashboard data (no re-fetch needed).
+  // This runs whenever a filter changes AFTER the initial search has been applied.
+  useEffect(() => {
+    if (!hasAppliedSearch) return;
+    setAppliedState(selectedState);
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+    setAppliedVerticals(selectedVerticals);
+    setAppliedAlnFilter(alnFilter.trim());
+  }, [hasAppliedSearch, selectedState, startDate, endDate, selectedVerticals, alnFilter]);
+
   const invokeWithAuth = async <T = any>(
     functionName: string,
     body: Record<string, unknown>
@@ -871,8 +882,8 @@ const Index = () => {
                   </div>
                   <div>
                     {hasAppliedSearch
-                      ? `Applied search: state=${appliedState || "(none)"} • ALN=${appliedAlnFilter || "(none)"} • start=${appliedStartDate ? format(appliedStartDate, "yyyy-MM-dd") : "(none)"} • end=${appliedEndDate ? format(appliedEndDate, "yyyy-MM-dd") : "(none)"} • verticals=${appliedVerticals.length}`
-                      : "Results update only after you click one of the source buttons below."}
+                      ? `Active filters: state=${appliedState || "(all)"} • ALN=${appliedAlnFilter || "(all)"} • start=${appliedStartDate ? format(appliedStartDate, "yyyy-MM-dd") : "(any)"} • end=${appliedEndDate ? format(appliedEndDate, "yyyy-MM-dd") : "(any)"} • verticals=${appliedVerticals.length || "all"}`
+                      : "Click a source button below to fetch data. Once loaded, filters apply automatically."}
                   </div>
                 </div>
 
