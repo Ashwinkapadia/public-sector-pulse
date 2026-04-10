@@ -344,6 +344,12 @@ const Index = () => {
 
     console.debug("handleFetchComplete: refreshing dashboard data");
 
+    // USAspending fetches ALL verticals for the state, so clear the vertical filter
+    // to ensure the user sees all fetched records instead of a filtered subset.
+    setSelectedVerticals([]);
+    setAppliedVerticals([]);
+    localStorage.setItem("dashboard_verticals", JSON.stringify([]));
+
     // Use invalidateQueries instead of removeQueries to preserve active observers.
     // removeQueries destroys the query entirely, so refetchQueries has nothing to target.
     // invalidateQueries marks data as stale and triggers active hook observers to refetch.
@@ -363,7 +369,7 @@ const Index = () => {
 
     toast({
       title: "Prime Awards Fetch Complete",
-      description: "Dashboard updated with new prime award data",
+      description: "Dashboard updated with new prime award data. Vertical filter cleared to show all results.",
     });
   }, [queryClient, toast]);
 
