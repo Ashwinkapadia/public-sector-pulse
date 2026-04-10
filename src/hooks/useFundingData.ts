@@ -97,8 +97,8 @@ export function useFundingRecords(
 
   return useQuery({
     queryKey: ["funding_records", state, startKey, endKey, verticalsKey, alnKey],
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnMount: "always",
     queryFn: async () => {
       console.log("[useFundingRecords] queryFn EXECUTING with", { state, startKey, endKey, verticalsKey, alnKey });
@@ -195,8 +195,8 @@ export function useFundingMetrics(
 
   return useQuery({
     queryKey: ["funding_metrics", state, startKey, endKey, verticalsKey, alnKey],
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnMount: "always",
     queryFn: async () => {
       console.log("[useFundingMetrics] Fetching", { state, startKey, endKey, verticalsKey, alnKey });
