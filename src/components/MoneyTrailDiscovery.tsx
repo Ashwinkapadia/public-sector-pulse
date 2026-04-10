@@ -189,12 +189,15 @@ export function MoneyTrailDiscovery() {
 
       {/* Trail Steps Indicator */}
       {(results.length > 0 || trail) && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
-          <Badge variant={results.length > 0 ? "default" : "outline"} className="gap-1">1. Grants.gov</Badge>
-          <ArrowRight className="h-3 w-3" />
-          <Badge variant={trail?.prime ? "default" : "outline"} className="gap-1">2. Prime Awards</Badge>
-          <ArrowRight className="h-3 w-3" />
-          <Badge variant={trail?.sub ? "default" : "outline"} className="gap-1">3. Sub-Awards</Badge>
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Badge variant={results.length > 0 ? "default" : "outline"} className="gap-1">1. Grants.gov</Badge>
+            <ArrowRight className="h-3 w-3" />
+            <Badge variant={trail?.prime ? "default" : "outline"} className="gap-1">2. Prime Awards</Badge>
+            <ArrowRight className="h-3 w-3" />
+            <Badge variant={trail?.sub ? "default" : "outline"} className="gap-1">3. Sub-Awards</Badge>
+          </div>
+          <MoneyTrailExport results={results} trail={trail} />
         </div>
       )}
 
