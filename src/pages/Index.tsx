@@ -276,6 +276,17 @@ const Index = () => {
     else localStorage.removeItem("dashboard_aln");
   }, [selectedState, startDate, endDate, selectedVerticals, alnFilter]);
 
+  // Auto-apply filters to the already-loaded dashboard data (no re-fetch needed).
+  // This runs whenever a filter changes AFTER the initial search has been applied.
+  useEffect(() => {
+    if (!hasAppliedSearch) return;
+    setAppliedState(selectedState);
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+    setAppliedVerticals(selectedVerticals);
+    setAppliedAlnFilter(alnFilter.trim());
+  }, [hasAppliedSearch, selectedState, startDate, endDate, selectedVerticals, alnFilter]);
+
   const invokeWithAuth = async <T = any>(
     functionName: string,
     body: Record<string, unknown>
