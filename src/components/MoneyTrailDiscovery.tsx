@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { MoneyTrailExport } from "@/components/MoneyTrailExport";
 
 const VERTICAL_OPTIONS = Object.keys(VERTICAL_MAPPINGS);
 
