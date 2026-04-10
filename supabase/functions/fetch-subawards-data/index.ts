@@ -25,8 +25,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify authentication using getClaims
+    // Verify authentication
     const authHeader = req.headers.get('Authorization');
+    console.log("Auth header present:", !!authHeader);
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -40,17 +41,16 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      console.error("Auth error:", claimsError);
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    console.log("getUser result:", user?.id, "error:", authError?.message);
+    if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const userId = claimsData.claims.sub as string;
+    const userId = user.id;
 
     // Use service role client for admin check and data operations
     const supabaseClient = createClient(
