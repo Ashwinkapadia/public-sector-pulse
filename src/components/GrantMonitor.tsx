@@ -38,7 +38,7 @@ interface Schedule {
   name: string;
   frequency: string;
   vertical_ids: string[];
-  email_address: string;
+  
   lookback_months: number;
   is_active: boolean;
   last_run_at: string | null;
