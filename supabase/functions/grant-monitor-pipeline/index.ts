@@ -426,10 +426,7 @@ async function runPipeline(
       })
       .eq("id", runId);
 
-    // Send email if address provided
-    if (emailAddress) {
-      await sendEmailWithCSV(emailAddress, alns, totalPrime, totalSub, csvContent);
-    }
+    // Email sending removed - results are saved in pipeline runs only
   } catch (err: any) {
     console.error("Pipeline run error:", err);
     await serviceClient
@@ -540,52 +537,5 @@ async function fetchUSASpendingAwards(
   return allResults;
 }
 
-// ─── Send email ───
-async function sendEmailWithCSV(
-  to: string,
-  alns: string[],
-  primeCount: number,
-  subCount: number,
-  csvContent: string
-) {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    console.error("LOVABLE_API_KEY not set, skipping email");
-    return;
-  }
 
-  const htmlBody = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #1a1a2e;">Grant Monitor Pipeline Report</h2>
-      <p>Your automated grant monitoring pipeline has completed.</p>
-      <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-        <tr style="background: #f0f0f0;">
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>ALN Numbers Processed</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${alns.length}</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Prime Awards Found</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${primeCount}</td>
-        </tr>
-        <tr style="background: #f0f0f0;">
-          <td style="padding: 8px; border: 1px solid #ddd;"><strong>Sub-Awards Found</strong></td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${subCount}</td>
-        </tr>
-      </table>
-      <h3>ALNs Processed:</h3>
-      <p>${alns.join(", ")}</p>
-      <hr />
-      <h3>CSV Data (attached below)</h3>
-      <pre style="background: #f5f5f5; padding: 10px; font-size: 11px; overflow: auto; max-height: 400px;">${csvContent}</pre>
-      <p style="color: #666; font-size: 12px; margin-top: 20px;">
-        This is an automated report from the Bonterra Grant Monitor.
-      </p>
-    </div>
-  `;
 
-  // Use Lovable AI gateway to send email via an edge function approach
-  // For now, log the email content - actual email sending would need Resend or similar
-  console.log(`Email would be sent to: ${to}`);
-  console.log(`Subject: Grant Monitor Report - ${alns.length} ALNs, ${primeCount} Prime Awards, ${subCount} Sub-Awards`);
-  console.log(`CSV rows: ${csvContent.split("\n").length}`);
-}

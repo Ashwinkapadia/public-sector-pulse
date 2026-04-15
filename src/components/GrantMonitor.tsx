@@ -38,7 +38,7 @@ interface Schedule {
   name: string;
   frequency: string;
   vertical_ids: string[];
-  email_address: string;
+  
   lookback_months: number;
   is_active: boolean;
   last_run_at: string | null;
@@ -134,7 +134,7 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [scheduleName, setScheduleName] = useState("");
   const [scheduleFrequency, setScheduleFrequency] = useState("daily");
-  const [scheduleEmail, setScheduleEmail] = useState("");
+  
   const [scheduleLookback, setScheduleLookback] = useState(3);
   const [scheduleVerticals, setScheduleVerticals] = useState<string[]>([]);
 
@@ -308,8 +308,8 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
 
   // Create schedule
   const createSchedule = async () => {
-    if (!scheduleName.trim() || !scheduleEmail.trim()) {
-      toast({ variant: "destructive", title: "Missing fields", description: "Name and email are required" });
+    if (!scheduleName.trim()) {
+      toast({ variant: "destructive", title: "Missing fields", description: "Name is required" });
       return;
     }
 
@@ -330,7 +330,7 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
       name: scheduleName,
       frequency: scheduleFrequency,
       vertical_ids: scheduleVerticals,
-      email_address: scheduleEmail,
+      email_address: "",
       lookback_months: scheduleLookback,
       is_active: true,
       next_run_at: nextRun.toISOString(),
@@ -344,7 +344,6 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
     toast({ title: "Schedule Created", description: `"${scheduleName}" will run ${scheduleFrequency}` });
     setScheduleDialogOpen(false);
     setScheduleName("");
-    setScheduleEmail("");
     setScheduleVerticals([]);
     queryClient.invalidateQueries({ queryKey: ["grant_monitor_schedules"] });
   };
@@ -397,7 +396,7 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
       if (error) throw error;
       toast({
         title: "Pipeline Started",
-        description: "The grant monitoring pipeline is running. You'll receive an email when complete.",
+        description: "The grant monitoring pipeline is running. Check Pipeline Runs for results.",
       });
       queryClient.invalidateQueries({ queryKey: ["grant_monitor_runs"] });
     } catch (err: any) {
@@ -650,15 +649,8 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label>Email for Reports</Label>
-                    <Input
-                      type="email"
-                      placeholder="your@email.com"
-                      value={scheduleEmail}
-                      onChange={(e) => setScheduleEmail(e.target.value)}
-                    />
-                  </div>
+
+
                   <div>
                     <Label>Prime Awards Lookback (months)</Label>
                     <Select value={String(scheduleLookback)} onValueChange={(v) => setScheduleLookback(Number(v))}>
@@ -725,7 +717,7 @@ export function GrantMonitor({ onSwitchTab }: GrantMonitorProps) {
                       <Badge variant="outline">{s.frequency}</Badge>
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      Email: {s.email_address} • Lookback: {s.lookback_months}mo
+                      Lookback: {s.lookback_months}mo
                       {s.vertical_ids?.length > 0 && ` • Verticals: ${s.vertical_ids.join(", ")}`}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
