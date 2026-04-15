@@ -426,10 +426,7 @@ async function runPipeline(
       })
       .eq("id", runId);
 
-    // Send email if address provided
-    if (emailAddress) {
-      await sendEmailWithCSV(emailAddress, alns, totalPrime, totalSub, csvContent);
-    }
+    // Email sending removed - results are saved in pipeline runs only
   } catch (err: any) {
     console.error("Pipeline run error:", err);
     await serviceClient
